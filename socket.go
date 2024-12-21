@@ -57,7 +57,6 @@ func (s *Socket) IsConnected() bool {
 func (s *Socket) close() {
 	if atomic.CompareAndSwapInt32(s.connected, socketConnectedYes, socketConnectedNo) {
 		_ = s.socket.Close()
-		return
 	}
 }
 

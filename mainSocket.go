@@ -17,7 +17,6 @@
 package netsvrBusiness
 
 import (
-	"context"
 	"encoding/binary"
 	netsvrProtocol "github.com/buexplain/netsvr-protocol-go/v4/netsvr"
 	"google.golang.org/protobuf/proto"
@@ -36,13 +35,10 @@ type MainSocket struct {
 	connId                 string
 	heartbeatInterval      time.Duration
 	sendCh                 chan []byte
-	closed                 *int32
+	connected              *atomic.Bool
 	closedCh               chan struct{}
 	wait                   *sync.WaitGroup
 }
-
-const mainSocketClosedNo = 0
-const mainSocketClosedYes = 1
 
 func NewMainSocket(eventHandler EventInterface, socket *Socket, workerHeartbeatMessage []byte, events netsvrProtocol.Event, processCmdGoroutineNum int, heartbeatInterval time.Duration) *MainSocket {
 	tmp := &MainSocket{
@@ -53,11 +49,10 @@ func NewMainSocket(eventHandler EventInterface, socket *Socket, workerHeartbeatM
 		events:                 events,
 		heartbeatInterval:      heartbeatInterval,
 		sendCh:                 make(chan []byte, 100),
-		closed:                 new(int32),
+		connected:              &atomic.Bool{},
 		closedCh:               make(chan struct{}),
 		wait:                   new(sync.WaitGroup),
 	}
-	context.WithCancel(context.Background())
 	copy(tmp.workerHeartbeatMessage, workerHeartbeatMessage)
 	return tmp
 }
@@ -122,7 +117,7 @@ func (r *MainSocket) LoopReceive() {
 				r.processEvent(message)
 				continue
 			}
-			if r.isClosed() {
+			if r.isConnected() == false {
 				break
 			}
 			r.reconnect()
@@ -171,16 +166,22 @@ func (r *MainSocket) processEvent(message []byte) {
 	}()
 }
 
-func (r *MainSocket) isClosed() bool {
-	return atomic.LoadInt32(r.closed) == mainSocketClosedYes
+func (r *MainSocket) isConnected() bool {
+	return r.connected.Load()
 }
 
 func (r *MainSocket) Connect() bool {
-	return r.socket.Connect()
+	if r.connected.CompareAndSwap(false, true) {
+		if r.socket.Connect() {
+			return true
+		}
+		r.connected.Store(false)
+	}
+	return false
 }
 
 func (r *MainSocket) reconnect() {
-	if r.socket.Connect() && !r.isClosed() {
+	if r.socket.Connect() && r.isConnected() {
 		r.Register()
 	}
 }
@@ -236,7 +237,7 @@ func (r *MainSocket) Register() bool {
 }
 
 func (r *MainSocket) Unregister() bool {
-	if r.connId == "" {
+	if r.connected.Load() == false {
 		return true
 	}
 	req := &netsvrProtocol.UnRegisterReq{}
@@ -273,7 +274,7 @@ func (r *MainSocket) Unregister() bool {
 }
 
 func (r *MainSocket) Close() {
-	if atomic.CompareAndSwapInt32(r.closed, mainSocketClosedNo, mainSocketClosedYes) == false {
+	if r.connected.CompareAndSwap(true, false) == false {
 		return
 	}
 	close(r.closedCh)

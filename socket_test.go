@@ -46,24 +46,25 @@ func TestSocket_Connect(t *testing.T) {
 	if s.Connect() != true {
 		t.Error("连接失败")
 	}
-	if atomic.LoadInt32(s.connected) != socketConnectedYes {
+	defer s.Close()
+	if s.IsConnected() == false {
 		t.Error("连接状态不正确")
 	}
-	s.Close()
 }
 
 func TestSocket_Send(t *testing.T) {
 	s := NewSocket("127.0.0.1:6061", time.Second*5, time.Second*5)
 	s.Connect()
+	defer s.Close()
 	if s.Send([]byte("~6YOt5rW35piO~")) != true {
 		t.Error("发送失败")
 	}
-	s.Close()
 }
 
 func TestSocket_Receive(t *testing.T) {
 	s := NewSocket("127.0.0.1:6061", time.Second*5, time.Second*5)
 	s.Connect()
+	defer s.Close()
 	message := make([]byte, 4)
 	binary.BigEndian.PutUint32(message[0:4], uint32(netsvrProtocol.Cmd_TopicCount))
 	s.Send(message)
@@ -83,6 +84,9 @@ func TestSocket_Close(t *testing.T) {
 	s := NewSocket("127.0.0.1:6061", time.Second*5, time.Second*5)
 	s.Connect()
 	s.Close()
+	if s.IsConnected() == true {
+		t.Error("连接没有关闭")
+	}
 	if atomic.LoadInt32(s.connected) != socketConnectedNo {
 		t.Error("关闭失败")
 	}

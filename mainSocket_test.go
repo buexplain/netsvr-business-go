@@ -87,6 +87,10 @@ func TestMainSocket_Connect(t *testing.T) {
 	if mainSocket.Connect() == false {
 		t.Error("Connect failed")
 	}
+	defer mainSocket.Close()
+	if mainSocket.isConnected() == false {
+		t.Error("socket is closed")
+	}
 	if mainSocket.socket.IsConnected() == false {
 		t.Error("socket is not connected")
 	}
@@ -96,6 +100,10 @@ func TestMainSocket_Register_Unregister(t *testing.T) {
 	mainSocket, _, _, _ := makeMainSocket()
 	if mainSocket.Connect() == false {
 		t.Error("Connect failed")
+	}
+	defer mainSocket.Close()
+	if mainSocket.isConnected() == false {
+		t.Error("socket is closed")
 	}
 	if mainSocket.socket.IsConnected() == false {
 		t.Error("socket is not connected")
@@ -118,6 +126,10 @@ func TestMainSocket_Send_Receive(t *testing.T) {
 	mainSocket, _, _, _ := makeMainSocket()
 	if mainSocket.Connect() == false {
 		t.Error("Connect failed")
+	}
+	defer mainSocket.Close()
+	if mainSocket.isConnected() == false {
+		t.Error("socket is closed")
 	}
 	if mainSocket.socket.IsConnected() == false {
 		t.Error("socket is not connected")
@@ -169,8 +181,11 @@ func TestMainSocket_Close(t *testing.T) {
 	if mainSocket.Connect() == false {
 		t.Error("Connect failed")
 	}
+	if mainSocket.isConnected() == false {
+		t.Error("Connect failed")
+	}
 	if mainSocket.socket.IsConnected() == false {
-		t.Error("socket is not connected")
+		t.Error("Connect failed")
 	}
 	if mainSocket.Register() == false {
 		t.Error("Register failed")
@@ -180,4 +195,10 @@ func TestMainSocket_Close(t *testing.T) {
 	mainSocket.LoopReceive()
 	mainSocket.Unregister()
 	mainSocket.Close()
+	if mainSocket.isConnected() == true {
+		t.Error("Close failed")
+	}
+	if mainSocket.socket.IsConnected() == true {
+		t.Error("Close failed")
+	}
 }
