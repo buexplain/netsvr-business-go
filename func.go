@@ -36,3 +36,8 @@ func WorkerAddrConvertToHex(workerAddr string) string {
 	binary.BigEndian.PutUint16(template[4:6], uint16(port))
 	return hex.EncodeToString(template)
 }
+
+// UniqIdConvertToWorkerAddrAsHex 将uniqId转为网关的worker服务器监听的地址的16进制字符串
+func UniqIdConvertToWorkerAddrAsHex(uniqId string) string {
+	return uniqId[0:12]
+}

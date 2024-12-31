@@ -64,7 +64,7 @@ func TestTaskSocketPool_Get(t *testing.T) {
 	if taskSocket == nil {
 		t.Error("Get failed")
 	}
-	defer taskSocket.release()
+	defer taskSocket.Release()
 	if taskSocket.GetWorkerAddr() != factory.GetWorkerAddr() {
 		t.Error("GetWorkerAddr failed")
 	}
@@ -94,7 +94,7 @@ func TestTaskSocketPool_ConcurrencyGet(t *testing.T) {
 			taskSocket := pool.Get()
 			time.After(time.Second)
 			if taskSocket != nil {
-				taskSocket.release()
+				taskSocket.Release()
 			}
 		}()
 	}
@@ -130,7 +130,7 @@ func TestTaskSocketPool_WaitTimeoutGet(t *testing.T) {
 		t.Error("WaitTimeoutGet failed")
 	}
 	for _, taskSocket := range taskSocketList {
-		taskSocket.release()
+		taskSocket.Release()
 	}
 	if len(pool.size) > 0 {
 		t.Error("WaitTimeoutGet failed")
@@ -156,7 +156,7 @@ func TestTaskSocketPool_LoopHeartbeat(t *testing.T) {
 		taskSocketList = append(taskSocketList, taskSocket)
 	}
 	for _, taskSocket := range taskSocketList {
-		taskSocket.release()
+		taskSocket.Release()
 	}
 	pool.LoopHeartbeat()
 	time.Sleep(time.Second * 3)
@@ -184,7 +184,7 @@ func TestTaskSocketPool_Close(t *testing.T) {
 		t.Error("Close failed")
 	}
 	for _, taskSocket := range taskSocketList {
-		taskSocket.release()
+		taskSocket.Release()
 	}
 	if len(pool.size) > 0 {
 		t.Error("Close failed")

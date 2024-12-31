@@ -15,28 +15,3 @@
  */
 
 package netsvrBusiness
-
-import "time"
-
-type TaskSocket struct {
-	Socket
-	pool *TaskSocketPool
-}
-
-func NewTaskSocket(workerAddr string, sendReceiveTimeout time.Duration, connectTimeout time.Duration, pool *TaskSocketPool) *TaskSocket {
-	return &TaskSocket{
-		Socket: Socket{
-			workerAddr:         workerAddr,
-			sendReceiveTimeout: sendReceiveTimeout,
-			connectTimeout:     connectTimeout,
-			connected:          new(int32),
-		},
-		pool: pool,
-	}
-}
-
-func (t *TaskSocket) Release() {
-	if t.IsConnected() {
-		t.pool.release(t)
-	}
-}

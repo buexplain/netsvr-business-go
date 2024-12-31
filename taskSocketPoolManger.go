@@ -48,7 +48,7 @@ func (t *TaskSocketPoolManger) GetSockets() []*TaskSocket {
 		socket := pool.Get()
 		if socket == nil {
 			for _, s := range ret {
-				s.release()
+				s.Release()
 			}
 			ret = nil
 			break

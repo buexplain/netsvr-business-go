@@ -42,7 +42,7 @@ func TestTaskSocketPoolManger_AddSocket_GetSocket(t *testing.T) {
 	if taskSocket == nil {
 		t.Error("GetSocket failed")
 	}
-	taskSocket.release()
+	taskSocket.Release()
 	poolManger.Close()
 }
 
@@ -60,7 +60,7 @@ func TestTaskSocketPoolManger_GetSockets(t *testing.T) {
 		t.Error("GetSockets failed")
 	}
 	for _, taskSocket := range taskSockets {
-		taskSocket.release()
+		taskSocket.Release()
 	}
 	poolManger.Close()
 }
