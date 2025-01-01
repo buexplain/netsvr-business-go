@@ -38,9 +38,75 @@ func NewNetBus(mainSocketManager *MainSocketManager, taskSocketPoolManger *TaskS
 	}
 }
 
+func (n *NetBus) ConnInfo(uniqIds []string, reqCustomerId bool, reqSession bool, reqTopic bool) map[string]*netsvrProtocol.ConnInfoRespItem {
+	fn := func(uniqIds []string) []byte {
+		connInfoReq := &netsvrProtocol.ConnInfoReq{
+			UniqIds:       uniqIds,
+			ReqCustomerId: reqCustomerId,
+			ReqSession:    reqSession,
+			ReqTopic:      reqTopic,
+		}
+		return n.pack(netsvrProtocol.Cmd_ConnInfo, connInfoReq)
+	}
+	if n.isSinglePoint() || len(uniqIds) == 1 {
+		taskSocket := n.getTaskSocketByUniqId(uniqIds[0])
+		if taskSocket == nil {
+			return nil
+		}
+		defer taskSocket.Release()
+		taskSocket.Send(fn(uniqIds))
+		respData := taskSocket.Receive()
+		if respData == nil {
+			logger.Error("call Cmd::ConnInfo failed because the connection to the netsvr was disconnected")
+			return nil
+		}
+		connInfoResp := &netsvrProtocol.ConnInfoResp{}
+		if err := proto.Unmarshal(respData[4:], connInfoResp); err != nil {
+			logger.Error("unmarshal netsvrProtocol.ConnInfoResp failed", "error", err)
+			return nil
+		}
+		return connInfoResp.GetItems()
+	}
+	group := n.getUniqIdsGroupByWorkerAddrAsHex(uniqIds)
+	if len(group) == 0 {
+		return nil
+	}
+	ret := make(map[string]*netsvrProtocol.ConnInfoRespItem)
+	for workerAddrAsHex, currentUniqIds := range group {
+		taskSocket := n.taskSocketPoolManger.GetSocket(workerAddrAsHex)
+		if taskSocket == nil {
+			continue
+		}
+		taskSocket.Send(fn(currentUniqIds))
+		respData := taskSocket.Receive()
+		if respData == nil {
+			logger.Error("call Cmd::ConnInfo failed because the connection to the netsvr was disconnected")
+			continue
+		}
+		connInfoResp := &netsvrProtocol.ConnInfoResp{}
+		if err := proto.Unmarshal(respData[4:], connInfoResp); err != nil {
+			logger.Error("unmarshal netsvrProtocol.ConnInfoResp failed", "error", err)
+			continue
+		}
+		for uniqId, item := range connInfoResp.GetItems() {
+			ret[uniqId] = item
+		}
+	}
+	return ret
+}
+
 func (n *NetBus) ConnInfoUpdate(connInfoUpdate *netsvrProtocol.ConnInfoUpdate) {
 	message := n.pack(netsvrProtocol.Cmd_ConnInfoUpdate, connInfoUpdate)
 	n.sendToSocketByUniqId(connInfoUpdate.GetUniqId(), message)
+}
+
+func (n *NetBus) SingleCast(uniqId string, data []byte) {
+	singleCast := &netsvrProtocol.SingleCast{
+		UniqId: uniqId,
+		Data:   data,
+	}
+	message := n.pack(netsvrProtocol.Cmd_SingleCast, singleCast)
+	n.sendToSocketByUniqId(uniqId, message)
 }
 
 func (n *NetBus) sendToSocketByUniqId(uniqId string, data []byte) {
@@ -60,6 +126,23 @@ func (n *NetBus) sendToSocketByUniqId(uniqId string, data []byte) {
 		taskSocket.Send(data)
 		return
 	}
+}
+
+func (n *NetBus) getTaskSocketByUniqId(uniqId string) *TaskSocket {
+	return n.taskSocketPoolManger.GetSocket(UniqIdConvertToWorkerAddrAsHex(uniqId))
+}
+
+func (n *NetBus) isSinglePoint() bool {
+	return n.taskSocketPoolManger.Count() == 1
+}
+
+func (n *NetBus) getUniqIdsGroupByWorkerAddrAsHex(uniqIds []string) map[string][]string {
+	ret := make(map[string][]string)
+	for _, uniqId := range uniqIds {
+		workerAddrAsHex := UniqIdConvertToWorkerAddrAsHex(uniqId)
+		ret[workerAddrAsHex] = append(ret[workerAddrAsHex], uniqId)
+	}
+	return ret
 }
 
 func (n *NetBus) pack(cmd netsvrProtocol.Cmd, req proto.Message) []byte {

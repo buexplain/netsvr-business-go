@@ -30,23 +30,23 @@ import (
 	"time"
 )
 
-type eventExample struct {
+type eventForMainSocketTest struct {
 }
 
-func (e *eventExample) onOpen(connOpen *netsvrProtocol.ConnOpen) {
+func (e *eventForMainSocketTest) onOpen(connOpen *netsvrProtocol.ConnOpen) {
 	logger.Info("onOpen", "connOpen", protojson.Format(connOpen))
 }
 
-func (e *eventExample) onMessage(transfer *netsvrProtocol.Transfer) {
+func (e *eventForMainSocketTest) onMessage(transfer *netsvrProtocol.Transfer) {
 	logger.Info("onMessage", "transfer", protojson.Format(transfer))
 }
 
-func (e *eventExample) onClose(connClose *netsvrProtocol.ConnClose) {
+func (e *eventForMainSocketTest) onClose(connClose *netsvrProtocol.ConnClose) {
 	logger.Info("onClose", "connClose", protojson.Format(connClose))
 }
 
 func makeMainSocket() (*MainSocket, EventInterface, netsvrProtocol.Event, *Socket) {
-	h := new(eventExample)
+	h := new(eventForMainSocketTest)
 	socket := NewSocket("127.0.0.1:6061", time.Second*25, time.Second*25)
 	events := netsvrProtocol.Event_OnOpen | netsvrProtocol.Event_OnClose | netsvrProtocol.Event_OnMessage
 	mainSocket := NewMainSocket(h, socket, []byte("~6YOt5rW35piO~"), events, 10, time.Second*25)
