@@ -19,21 +19,23 @@ package netsvrBusiness
 import "time"
 
 type TaskSocketFactory struct {
-	workerAddr         string
-	sendReceiveTimeout time.Duration
-	connectTimeout     time.Duration
+	workerAddr     string
+	receiveTimeout time.Duration
+	sendTimeout    time.Duration
+	connectTimeout time.Duration
 }
 
-func NewTaskSocketFactory(workerAddr string, sendReceiveTimeout time.Duration, connectTimeout time.Duration) *TaskSocketFactory {
+func NewTaskSocketFactory(workerAddr string, receiveTimeout time.Duration, sendTimeout time.Duration, connectTimeout time.Duration) *TaskSocketFactory {
 	return &TaskSocketFactory{
-		workerAddr:         workerAddr,
-		sendReceiveTimeout: sendReceiveTimeout,
-		connectTimeout:     connectTimeout,
+		workerAddr:     workerAddr,
+		receiveTimeout: receiveTimeout,
+		sendTimeout:    sendTimeout,
+		connectTimeout: connectTimeout,
 	}
 }
 
 func (t *TaskSocketFactory) Make(pool *TaskSocketPool) *TaskSocket {
-	socket := NewTaskSocket(t.workerAddr, t.sendReceiveTimeout, t.connectTimeout, pool)
+	socket := NewTaskSocket(t.workerAddr, t.receiveTimeout, t.sendTimeout, t.connectTimeout, pool)
 	if socket.Connect() {
 		return socket
 	}

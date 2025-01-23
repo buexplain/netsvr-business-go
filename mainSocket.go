@@ -141,7 +141,7 @@ func (r *MainSocket) processEvent(message []byte) {
 			if err != nil {
 				return
 			}
-			r.eventHandler.onMessage(transfer)
+			r.eventHandler.OnMessage(transfer)
 			return
 		}
 		if cmd == netsvrProtocol.Cmd_ConnClose {
@@ -150,7 +150,7 @@ func (r *MainSocket) processEvent(message []byte) {
 			if err != nil {
 				return
 			}
-			r.eventHandler.onClose(connClose)
+			r.eventHandler.OnClose(connClose)
 			return
 		}
 		if cmd == netsvrProtocol.Cmd_ConnOpen {
@@ -159,7 +159,7 @@ func (r *MainSocket) processEvent(message []byte) {
 			if err != nil {
 				return
 			}
-			r.eventHandler.onOpen(connOpen)
+			r.eventHandler.OnOpen(connOpen)
 			return
 		}
 		logger.Error("unknown cmd", "cmd", cmd)
@@ -250,7 +250,7 @@ func (r *MainSocket) Unregister() bool {
 		logger.Error("marshal netsvrProtocol.UnRegisterReq failed", "error", err)
 		return false
 	}
-	socket := NewSocket(r.socket.workerAddr, r.socket.sendReceiveTimeout, r.socket.connectTimeout)
+	socket := NewSocket(r.socket.workerAddr, r.socket.receiveTimeout, r.socket.sendTimeout, r.socket.connectTimeout)
 	if socket.Connect() == false {
 		return false
 	}

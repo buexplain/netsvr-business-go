@@ -26,7 +26,7 @@ import (
 )
 
 func TestSocket_NewSocket(t *testing.T) {
-	s := NewSocket("127.0.0.1:6061", time.Second*5, time.Second*5)
+	s := NewSocket("127.0.0.1:6061", time.Second*5, time.Second*5, time.Second*5)
 	if s.socket != nil {
 		t.Error("连接已经打开")
 	}
@@ -36,13 +36,13 @@ func TestSocket_NewSocket(t *testing.T) {
 	if s.connectTimeout != time.Second*5 {
 		t.Error("连接超时时间不正确")
 	}
-	if s.sendReceiveTimeout != time.Second*5 {
+	if s.receiveTimeout != time.Second*5 || s.sendTimeout != time.Second*5 {
 		t.Error("发送接收超时时间不正确")
 	}
 }
 
 func TestSocket_Connect(t *testing.T) {
-	s := NewSocket("127.0.0.1:6061", time.Second*5, time.Second*5)
+	s := NewSocket("127.0.0.1:6061", time.Second*5, time.Second*5, time.Second*5)
 	if s.Connect() != true {
 		t.Error("连接失败")
 	}
@@ -53,7 +53,7 @@ func TestSocket_Connect(t *testing.T) {
 }
 
 func TestSocket_Send(t *testing.T) {
-	s := NewSocket("127.0.0.1:6061", time.Second*5, time.Second*5)
+	s := NewSocket("127.0.0.1:6061", time.Second*5, time.Second*5, time.Second*5)
 	s.Connect()
 	defer s.Close()
 	if s.Send([]byte("~6YOt5rW35piO~")) != true {
@@ -62,7 +62,7 @@ func TestSocket_Send(t *testing.T) {
 }
 
 func TestSocket_Receive(t *testing.T) {
-	s := NewSocket("127.0.0.1:6061", time.Second*5, time.Second*5)
+	s := NewSocket("127.0.0.1:6061", time.Second*5, time.Second*5, time.Second*5)
 	s.Connect()
 	defer s.Close()
 	message := make([]byte, 4)
@@ -81,7 +81,7 @@ func TestSocket_Receive(t *testing.T) {
 }
 
 func TestSocket_Close(t *testing.T) {
-	s := NewSocket("127.0.0.1:6061", time.Second*5, time.Second*5)
+	s := NewSocket("127.0.0.1:6061", time.Second*5, time.Second*5, time.Second*5)
 	s.Connect()
 	s.Close()
 	if s.IsConnected() == true {

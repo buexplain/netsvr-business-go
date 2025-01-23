@@ -21,38 +21,42 @@ import (
 	"context"
 	netsvrProtocol "github.com/buexplain/netsvr-protocol-go/v4/netsvr"
 	"github.com/gorilla/websocket"
+	"sync"
 	"testing"
 	"time"
 )
 
 type eventForNetBusTest struct {
+	netBus *NetBus
 }
 
-func (e *eventForNetBusTest) onOpen(connOpen *netsvrProtocol.ConnOpen) {
-	netBus.SingleCast(connOpen.UniqId, []byte(connOpen.UniqId))
+func (e *eventForNetBusTest) OnOpen(connOpen *netsvrProtocol.ConnOpen) {
+	e.netBus.SingleCast(connOpen.UniqId, []byte(connOpen.UniqId))
 }
 
-func (e *eventForNetBusTest) onMessage(_ *netsvrProtocol.Transfer) {
+func (e *eventForNetBusTest) OnMessage(_ *netsvrProtocol.Transfer) {
 }
 
-func (e *eventForNetBusTest) onClose(_ *netsvrProtocol.ConnClose) {
+func (e *eventForNetBusTest) OnClose(_ *netsvrProtocol.ConnClose) {
 }
 
 func makeNetBus() *NetBus {
 	workerAddr := "127.0.0.1:6061"
 	workerHeartbeatMessage := []byte("~6YOt5rW35piO~")
-	socket := NewSocket(workerAddr, time.Second*25, time.Second*25)
+	socket := NewSocket(workerAddr, time.Second*25, time.Second*25, time.Second*25)
 	events := netsvrProtocol.Event_OnOpen | netsvrProtocol.Event_OnClose | netsvrProtocol.Event_OnMessage
-	mainSocket := NewMainSocket(new(eventForNetBusTest), socket, workerHeartbeatMessage, events, 10, time.Second*25)
+	h := new(eventForNetBusTest)
+	mainSocket := NewMainSocket(h, socket, workerHeartbeatMessage, events, 10, time.Second*25)
 	mainSocketManager := NewMainSocketManager()
 	mainSocketManager.AddSocket(mainSocket)
 	mainSocketManager.Start()
-	factory := NewTaskSocketFactory(workerAddr, time.Second*10, time.Second*10)
+	factory := NewTaskSocketFactory(workerAddr, time.Second*10, time.Second*10, time.Second*10)
 	pool := NewTaskSocketPool(10, factory, time.Second*10, time.Second*10, workerHeartbeatMessage)
 	pool.LoopHeartbeat()
 	taskSocketPoolManger := NewTaskSocketPoolManger()
 	taskSocketPoolManger.AddSocket(pool)
-	return NewNetBus(mainSocketManager, taskSocketPoolManger)
+	h.netBus = NewNetBus(mainSocketManager, taskSocketPoolManger)
+	return h.netBus
 }
 
 type wssForNetBusTest struct {
@@ -86,20 +90,27 @@ func getWss() (*wssForNetBusTest, error) {
 }
 
 var netBus *NetBus
+var netBusOnce sync.Once
 
 func init() {
-	netBus = makeNetBus()
+	netBusOnce = sync.Once{}
+}
+
+func initNetBus() {
+	netBusOnce.Do(func() {
+		netBus = makeNetBus()
+	})
 }
 
 func TestNetBus_NewNetBus(t *testing.T) {
-	netBus = makeNetBus()
-	if netBus == nil {
+	nb := makeNetBus()
+	if nb == nil {
 		t.Error("netBus is nil")
 	}
-	if netBus.mainSocketManager == nil {
+	if nb.mainSocketManager == nil {
 		t.Error("netBus.mainSocketManager is nil")
 	}
-	if netBus.taskSocketPoolManger == nil {
+	if nb.taskSocketPoolManger == nil {
 		t.Error("netBus.taskSocketPoolManger is nil")
 	}
 }
@@ -116,6 +127,7 @@ func TestNetBus_SingleCast(t *testing.T) {
 }
 
 func TestNetBus_ConnInfo(t *testing.T) {
+	initNetBus()
 	wss, err := getWss()
 	if err != nil {
 		t.Fatal("websocket dial error", "error", err)
@@ -131,6 +143,7 @@ func TestNetBus_ConnInfo(t *testing.T) {
 }
 
 func TestNetBus_ConnInfoUpdate(t *testing.T) {
+	initNetBus()
 	wss, err := getWss()
 	if err != nil {
 		t.Fatal("websocket dial error", "error", err)

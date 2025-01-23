@@ -21,7 +21,7 @@ import (
 )
 
 type EventInterface interface {
-	onOpen(connOpen *netsvrProtocol.ConnOpen)
-	onMessage(transfer *netsvrProtocol.Transfer)
-	onClose(connClose *netsvrProtocol.ConnClose)
+	OnOpen(connOpen *netsvrProtocol.ConnOpen)
+	OnMessage(transfer *netsvrProtocol.Transfer)
+	OnClose(connClose *netsvrProtocol.ConnClose)
 }

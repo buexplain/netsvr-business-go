@@ -26,7 +26,7 @@ import (
 )
 
 func TestTaskSocketPool_NewTaskSocketPool(t *testing.T) {
-	factory := NewTaskSocketFactory("127.0.0.1:6061", time.Second*10, time.Second*10)
+	factory := NewTaskSocketFactory("127.0.0.1:6061", time.Second*10, time.Second*10, time.Second*10)
 	pool := NewTaskSocketPool(10, factory, time.Second*10, time.Second*10, []byte("~6YOt5rW35piO~"))
 	defer pool.Close()
 	if pool.pool == nil || cap(pool.pool) != 10 {
@@ -44,7 +44,7 @@ func TestTaskSocketPool_NewTaskSocketPool(t *testing.T) {
 }
 
 func TestTaskSocketPool_GetWorkerAddr(t *testing.T) {
-	factory := NewTaskSocketFactory("127.0.0.1:6061", time.Second*10, time.Second*10)
+	factory := NewTaskSocketFactory("127.0.0.1:6061", time.Second*10, time.Second*10, time.Second*10)
 	pool := NewTaskSocketPool(10, factory, time.Second*10, time.Second*10, []byte("~6YOt5rW35piO~"))
 	defer pool.Close()
 	if pool.GetWorkerAddr() != factory.GetWorkerAddr() {
@@ -54,7 +54,7 @@ func TestTaskSocketPool_GetWorkerAddr(t *testing.T) {
 
 func TestTaskSocketPool_Get(t *testing.T) {
 	size := 10
-	factory := NewTaskSocketFactory("127.0.0.1:6061", time.Second*10, time.Second*10)
+	factory := NewTaskSocketFactory("127.0.0.1:6061", time.Second*10, time.Second*10, time.Second*10)
 	pool := NewTaskSocketPool(size, factory, time.Second*10, time.Second*10, []byte("~6YOt5rW35piO~"))
 	defer pool.Close()
 	if pool.GetWorkerAddr() != factory.GetWorkerAddr() {
@@ -81,7 +81,7 @@ func TestTaskSocketPool_Get(t *testing.T) {
 
 func TestTaskSocketPool_ConcurrencyGet(t *testing.T) {
 	size := 10
-	factory := NewTaskSocketFactory("127.0.0.1:6061", time.Second*10, time.Second*10)
+	factory := NewTaskSocketFactory("127.0.0.1:6061", time.Second*10, time.Second*10, time.Second*10)
 	pool := NewTaskSocketPool(size, factory, time.Second*10, time.Second*10, []byte("~6YOt5rW35piO~"))
 	defer pool.Close()
 	wg := sync.WaitGroup{}
@@ -109,7 +109,7 @@ func TestTaskSocketPool_ConcurrencyGet(t *testing.T) {
 
 func TestTaskSocketPool_WaitTimeoutGet(t *testing.T) {
 	size := 2
-	factory := NewTaskSocketFactory("127.0.0.1:6061", time.Second*10, time.Second*10)
+	factory := NewTaskSocketFactory("127.0.0.1:6061", time.Second*10, time.Second*10, time.Second*10)
 	pool := NewTaskSocketPool(size, factory, time.Second*10, time.Second*10, []byte("~6YOt5rW35piO~"))
 	defer pool.Close()
 	taskSocketList := make([]*TaskSocket, 0, size)
@@ -148,7 +148,7 @@ func TestTaskSocketPool_LoopHeartbeat(t *testing.T) {
 		logger = defaultLog
 	}()
 	size := 10
-	factory := NewTaskSocketFactory("127.0.0.1:6061", time.Second*10, time.Second*10)
+	factory := NewTaskSocketFactory("127.0.0.1:6061", time.Second*10, time.Second*10, time.Second*10)
 	pool := NewTaskSocketPool(size, factory, time.Second*10, time.Millisecond*100, []byte("~6YOt5rW35piO~"))
 	taskSocketList := make([]*TaskSocket, 0, size)
 	for i := 0; i < size; i++ {
@@ -170,7 +170,7 @@ func TestTaskSocketPool_LoopHeartbeat(t *testing.T) {
 
 func TestTaskSocketPool_Close(t *testing.T) {
 	size := 10
-	factory := NewTaskSocketFactory("127.0.0.1:6061", time.Second*10, time.Second*10)
+	factory := NewTaskSocketFactory("127.0.0.1:6061", time.Second*10, time.Second*10, time.Second*10)
 	pool := NewTaskSocketPool(size, factory, time.Second*10, time.Second*10, []byte("~6YOt5rW35piO~"))
 	taskSocketList := make([]*TaskSocket, 0, size)
 	for i := 0; i < size; i++ {

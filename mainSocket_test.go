@@ -33,21 +33,21 @@ import (
 type eventForMainSocketTest struct {
 }
 
-func (e *eventForMainSocketTest) onOpen(connOpen *netsvrProtocol.ConnOpen) {
-	logger.Info("onOpen", "connOpen", protojson.Format(connOpen))
+func (e *eventForMainSocketTest) OnOpen(connOpen *netsvrProtocol.ConnOpen) {
+	logger.Info("OnOpen", "connOpen", protojson.Format(connOpen))
 }
 
-func (e *eventForMainSocketTest) onMessage(transfer *netsvrProtocol.Transfer) {
-	logger.Info("onMessage", "transfer", protojson.Format(transfer))
+func (e *eventForMainSocketTest) OnMessage(transfer *netsvrProtocol.Transfer) {
+	logger.Info("OnMessage", "transfer", protojson.Format(transfer))
 }
 
-func (e *eventForMainSocketTest) onClose(connClose *netsvrProtocol.ConnClose) {
-	logger.Info("onClose", "connClose", protojson.Format(connClose))
+func (e *eventForMainSocketTest) OnClose(connClose *netsvrProtocol.ConnClose) {
+	logger.Info("OnClose", "connClose", protojson.Format(connClose))
 }
 
 func makeMainSocket() (*MainSocket, EventInterface, netsvrProtocol.Event, *Socket) {
 	h := new(eventForMainSocketTest)
-	socket := NewSocket("127.0.0.1:6061", time.Second*25, time.Second*25)
+	socket := NewSocket("127.0.0.1:6061", time.Second*25, time.Second*25, time.Second*25)
 	events := netsvrProtocol.Event_OnOpen | netsvrProtocol.Event_OnClose | netsvrProtocol.Event_OnMessage
 	mainSocket := NewMainSocket(h, socket, []byte("~6YOt5rW35piO~"), events, 10, time.Second*25)
 	return mainSocket, h, events, socket
@@ -143,6 +143,7 @@ func TestMainSocket_Send_Receive(t *testing.T) {
 	if err != nil {
 		t.Error("websocket dial error", "error", err)
 	}
+	time.Sleep(time.Second * 1)
 	//从客户端发送消息到服务端, 用于测试服务端是否能收到onmessage事件
 	if err := wss.WriteMessage(websocket.TextMessage, []byte("hello world")); err != nil {
 		t.Error("websocket write message error", "error", err)
@@ -155,10 +156,12 @@ func TestMainSocket_Send_Receive(t *testing.T) {
 	message, _ = (proto.MarshalOptions{}).MarshalAppend(message, &broadcast)
 	mainSocket.Send(message)
 	//检查服务端的发送能力是否正常
-	if _, message, err := wss.ReadMessage(); err != nil {
+	if _, broadcastData, err := wss.ReadMessage(); err != nil {
 		t.Error("websocket read message error", "error", err)
-	} else if bytes.EqualFold(message, broadcast.Data) == false {
-		t.Error("websocket read message error", "error", "data not equal")
+	} else if bytes.EqualFold(broadcastData, broadcast.Data) == false {
+		t.Error("websocket read message error, data not equal", "broadcastData="+string(broadcastData))
+	} else {
+		t.Log("websocket read message success", "broadcastData="+string(broadcastData))
 	}
 	time.Sleep(time.Second * 1)
 	_ = wss.Close()
@@ -172,7 +175,7 @@ func TestMainSocket_Send_Receive(t *testing.T) {
 		t.Error("mainSocket connClose error", "logStr", logStr)
 	}
 	if strings.Contains(logStr, "transfer=") == false {
-		t.Error("mainSocket onMessage error", "logStr", logStr)
+		t.Error("mainSocket OnMessage error", "logStr", logStr)
 	}
 }
 

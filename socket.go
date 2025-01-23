@@ -26,23 +26,25 @@ import (
 )
 
 type Socket struct {
-	workerAddr         string
-	sendReceiveTimeout time.Duration
-	connectTimeout     time.Duration
-	socket             net.Conn
-	connected          *int32
+	workerAddr     string
+	receiveTimeout time.Duration
+	sendTimeout    time.Duration
+	connectTimeout time.Duration
+	socket         net.Conn
+	connected      *int32
 }
 
 const socketConnectedNo = 0
 const socketConnectIng = 1
 const socketConnectedYes = 2
 
-func NewSocket(workerAddr string, sendReceiveTimeout time.Duration, connectTimeout time.Duration) *Socket {
+func NewSocket(workerAddr string, receiveTimeout time.Duration, sendTimeout time.Duration, connectTimeout time.Duration) *Socket {
 	return &Socket{
-		workerAddr:         workerAddr,
-		sendReceiveTimeout: sendReceiveTimeout,
-		connectTimeout:     connectTimeout,
-		connected:          new(int32),
+		workerAddr:     workerAddr,
+		receiveTimeout: receiveTimeout,
+		sendTimeout:    sendTimeout,
+		connectTimeout: connectTimeout,
+		connected:      new(int32),
 	}
 }
 
@@ -98,7 +100,13 @@ func (s *Socket) Send(message []byte) bool {
 	//写入到连接中
 	for {
 		//设置写超时
-		if err = s.socket.SetWriteDeadline(time.Now().Add(s.sendReceiveTimeout)); err != nil {
+		var timeout time.Time
+		if s.sendTimeout > 0 {
+			timeout = time.Now().Add(s.sendTimeout)
+		} else {
+			timeout = time.Time{}
+		}
+		if err = s.socket.SetWriteDeadline(timeout); err != nil {
 			if s.IsConnected() {
 				logger.Info("set write timeout failed", "error", err)
 			}
@@ -135,7 +143,13 @@ func (s *Socket) Send(message []byte) bool {
 }
 
 func (s *Socket) Receive() []byte {
-	if err := s.socket.SetReadDeadline(time.Now().Add(s.sendReceiveTimeout)); err != nil {
+	var timeout time.Time
+	if s.receiveTimeout > 0 {
+		timeout = time.Now().Add(s.receiveTimeout)
+	} else {
+		timeout = time.Time{}
+	}
+	if err := s.socket.SetReadDeadline(timeout); err != nil {
 		if s.IsConnected() {
 			s.close()
 			logger.Info("set read timeout failed", "error", err)

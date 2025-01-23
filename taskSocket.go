@@ -23,13 +23,14 @@ type TaskSocket struct {
 	pool *TaskSocketPool
 }
 
-func NewTaskSocket(workerAddr string, sendReceiveTimeout time.Duration, connectTimeout time.Duration, pool *TaskSocketPool) *TaskSocket {
+func NewTaskSocket(workerAddr string, receiveTimeout time.Duration, sendTimeout time.Duration, connectTimeout time.Duration, pool *TaskSocketPool) *TaskSocket {
 	return &TaskSocket{
 		Socket: Socket{
-			workerAddr:         workerAddr,
-			sendReceiveTimeout: sendReceiveTimeout,
-			connectTimeout:     connectTimeout,
-			connected:          new(int32),
+			workerAddr:     workerAddr,
+			receiveTimeout: receiveTimeout,
+			sendTimeout:    sendTimeout,
+			connectTimeout: connectTimeout,
+			connected:      new(int32),
 		},
 		pool: pool,
 	}
