@@ -14,14 +14,12 @@
 * limitations under the License.
  */
 
-package netsvrBusiness
+package resp
 
 import (
 	"github.com/buexplain/netsvr-protocol-go/v5/netsvrProtocol"
 )
 
-type EventInterface interface {
-	OnOpen(connOpen *netsvrProtocol.ConnOpen)
-	OnMessage(transfer *netsvrProtocol.Transfer)
-	OnClose(connClose *netsvrProtocol.ConnClose)
+type LimitResp struct {
+	Data map[string]*netsvrProtocol.LimitResp
 }

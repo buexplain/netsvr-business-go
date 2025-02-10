@@ -19,7 +19,7 @@ package netsvrBusiness
 import (
 	"bytes"
 	"context"
-	netsvrProtocol "github.com/buexplain/netsvr-protocol-go/v4/netsvr"
+	"github.com/buexplain/netsvr-protocol-go/v5/netsvrProtocol"
 	"github.com/gorilla/websocket"
 	"sync"
 	"testing"
@@ -133,11 +133,12 @@ func TestNetBus_ConnInfo(t *testing.T) {
 		t.Fatal("websocket dial error", "error", err)
 	}
 	defer wss.close()
-	ret := netBus.ConnInfo([]string{wss.uniqId}, true, true, true)
-	if ret == nil {
+	connInfo := netBus.ConnInfo([]string{wss.uniqId}, true, true, true)
+	if connInfo == nil {
 		t.Fatal("netBus.ConnInfo return nil")
 	}
-	if _, ok := ret[wss.uniqId]; !ok {
+	connInfoMap := connInfo.ToMap()
+	if _, ok := connInfoMap[wss.uniqId]; !ok {
 		t.Error("netBus.ConnInfo return nil")
 	}
 }
@@ -163,16 +164,21 @@ func TestNetBus_ConnInfoUpdate(t *testing.T) {
 	if connInfo == nil {
 		t.Fatal("netBus.ConnInfo return nil")
 	}
-	if _, ok := connInfo[wss.uniqId]; !ok {
+	connInfoMap := connInfo.ToMap()
+	if _, ok := connInfoMap[wss.uniqId]; !ok {
 		t.Error("netBus.ConnInfo return nil")
 	}
-	if connInfo[wss.uniqId].Session != connInfoUpdate.NewSession {
+	if connInfoMap[wss.uniqId].Session != connInfoUpdate.NewSession {
 		t.Error("netBus.ConnInfo return nil")
 	}
-	if connInfo[wss.uniqId].CustomerId != connInfoUpdate.NewCustomerId {
+	if connInfoMap[wss.uniqId].CustomerId != connInfoUpdate.NewCustomerId {
 		t.Error("netBus.ConnInfo return nil")
 	}
-	if connInfo[wss.uniqId].Topics[0] != connInfoUpdate.NewTopics[0] {
+	if connInfoMap[wss.uniqId].Topics[0] != connInfoUpdate.NewTopics[0] {
 		t.Error("netBus.ConnInfo return nil")
 	}
+}
+
+func TestNetBus_ConnInfoDelete(t *testing.T) {
+
 }

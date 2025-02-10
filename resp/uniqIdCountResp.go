@@ -14,14 +14,21 @@
 * limitations under the License.
  */
 
-package netsvrBusiness
+package resp
 
 import (
 	"github.com/buexplain/netsvr-protocol-go/v5/netsvrProtocol"
 )
 
-type EventInterface interface {
-	OnOpen(connOpen *netsvrProtocol.ConnOpen)
-	OnMessage(transfer *netsvrProtocol.Transfer)
-	OnClose(connClose *netsvrProtocol.ConnClose)
+type UniqIdCountResp struct {
+	Data map[string]*netsvrProtocol.UniqIdCountResp
+}
+
+// Count 获取总数量
+func (u *UniqIdCountResp) Count() int32 {
+	var ret int32
+	for _, v := range u.Data {
+		ret += v.Count
+	}
+	return ret
 }

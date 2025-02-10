@@ -14,14 +14,22 @@
 * limitations under the License.
  */
 
-package netsvrBusiness
+package resp
 
 import (
 	"github.com/buexplain/netsvr-protocol-go/v5/netsvrProtocol"
+	"slices"
 )
 
-type EventInterface interface {
-	OnOpen(connOpen *netsvrProtocol.ConnOpen)
-	OnMessage(transfer *netsvrProtocol.Transfer)
-	OnClose(connClose *netsvrProtocol.ConnClose)
+type CheckOnlineResp struct {
+	Data map[string]*netsvrProtocol.CheckOnlineResp
+}
+
+func (c *CheckOnlineResp) Has(uniqId string) bool {
+	for _, v := range c.Data {
+		if slices.Contains(v.UniqIds, uniqId) {
+			return true
+		}
+	}
+	return false
 }

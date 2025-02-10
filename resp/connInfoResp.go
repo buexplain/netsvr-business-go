@@ -14,14 +14,22 @@
 * limitations under the License.
  */
 
-package netsvrBusiness
+package resp
 
 import (
 	"github.com/buexplain/netsvr-protocol-go/v5/netsvrProtocol"
 )
 
-type EventInterface interface {
-	OnOpen(connOpen *netsvrProtocol.ConnOpen)
-	OnMessage(transfer *netsvrProtocol.Transfer)
-	OnClose(connClose *netsvrProtocol.ConnClose)
+type ConnInfoResp struct {
+	Data map[string]*netsvrProtocol.ConnInfoResp
+}
+
+func (c *ConnInfoResp) ToMap() map[string]*netsvrProtocol.ConnInfoRespItem {
+	ret := make(map[string]*netsvrProtocol.ConnInfoRespItem, len(c.Data))
+	for _, v := range c.Data {
+		for uniqId, item := range v.Items {
+			ret[uniqId] = item
+		}
+	}
+	return ret
 }
