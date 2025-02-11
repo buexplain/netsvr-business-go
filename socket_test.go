@@ -47,6 +47,9 @@ func TestSocket_Connect(t *testing.T) {
 		t.Error("连接失败")
 	}
 	defer s.Close()
+	if s.socketBufIO == nil {
+		t.Error("Socket.socketBufIO为空")
+	}
 	if s.IsConnected() == false {
 		t.Error("连接状态不正确")
 	}
