@@ -17,7 +17,7 @@
 package taskSocket
 
 import (
-	"github.com/buexplain/netsvr-business-go/log"
+	"github.com/buexplain/netsvr-business-go/v2/log"
 	"time"
 )
 

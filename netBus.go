@@ -19,10 +19,10 @@ package netsvrBusiness
 import (
 	"encoding/binary"
 	"fmt"
-	"github.com/buexplain/netsvr-business-go/contract"
-	"github.com/buexplain/netsvr-business-go/log"
-	"github.com/buexplain/netsvr-business-go/ret"
-	"github.com/buexplain/netsvr-business-go/taskSocket"
+	"github.com/buexplain/netsvr-business-go/v2/contract"
+	"github.com/buexplain/netsvr-business-go/v2/log"
+	"github.com/buexplain/netsvr-business-go/v2/ret"
+	"github.com/buexplain/netsvr-business-go/v2/taskSocket"
 	"github.com/buexplain/netsvr-protocol-go/v6/netsvrProtocol"
 	"google.golang.org/protobuf/proto"
 )

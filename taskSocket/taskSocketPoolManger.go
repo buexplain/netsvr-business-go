@@ -16,7 +16,7 @@
 
 package taskSocket
 
-import "github.com/buexplain/netsvr-business-go/contract"
+import "github.com/buexplain/netsvr-business-go/v2/contract"
 
 type Manger struct {
 	pools map[string]*Pool

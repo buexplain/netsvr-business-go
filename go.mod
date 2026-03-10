@@ -1,4 +1,4 @@
-module github.com/buexplain/netsvr-business-go
+module github.com/buexplain/netsvr-business-go/v2
 
 go 1.23
 

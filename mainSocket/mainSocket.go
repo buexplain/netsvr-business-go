@@ -18,9 +18,9 @@ package mainSocket
 
 import (
 	"encoding/binary"
-	"github.com/buexplain/netsvr-business-go/contract"
-	"github.com/buexplain/netsvr-business-go/log"
-	"github.com/buexplain/netsvr-business-go/socket"
+	"github.com/buexplain/netsvr-business-go/v2/contract"
+	"github.com/buexplain/netsvr-business-go/v2/log"
+	"github.com/buexplain/netsvr-business-go/v2/socket"
 	"github.com/buexplain/netsvr-protocol-go/v6/netsvrProtocol"
 	"google.golang.org/protobuf/proto"
 	"runtime/debug"

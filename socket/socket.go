@@ -20,7 +20,7 @@ import (
 	"bufio"
 	"encoding/binary"
 	"errors"
-	"github.com/buexplain/netsvr-business-go/log"
+	"github.com/buexplain/netsvr-business-go/v2/log"
 	"io"
 	"net"
 	"sync/atomic"
