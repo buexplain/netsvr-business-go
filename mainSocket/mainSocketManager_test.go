@@ -29,20 +29,6 @@ func TestMainSocketManager_NewManager(t *testing.T) {
 	}
 }
 
-func TestMainSocketManager_GetSockets(t *testing.T) {
-	tmp := NewManager()
-	if tmp.GetSockets() != nil {
-		t.Error("GetSockets error")
-	}
-}
-
-func TestMainSocketManager_GetSocket(t *testing.T) {
-	tmp := NewManager()
-	if tmp.GetSocket("") != nil {
-		t.Error("GetSocket error")
-	}
-}
-
 func TestMainSocketManager_AddSocket(t *testing.T) {
 	tmp := NewManager()
 	mainSocket, _, _, _ := makeMainSocket()
@@ -61,26 +47,11 @@ func TestMainSocketManager_Start_Close(t *testing.T) {
 		t.Error("Start error")
 		return
 	}
-	if tmp.GetSockets() == nil {
-		t.Error("Start error")
-		return
-	}
 	if mainSocket.socket.IsConnected() == false {
 		t.Error("Start error")
 		return
 	}
-	if tmp.GetSocket(contract.AddrConvertToHex(mainSocket.GetAddr())) == nil {
-		t.Error("Start error")
-		return
-	}
 	tmp.Close()
-	if tmp.GetSockets() != nil {
-		t.Error("Close error")
-		return
-	}
-	if tmp.GetSocket(mainSocket.GetAddr()) != nil {
-		t.Error("Close error")
-	}
 	if tmp.connected.Load() == true {
 		t.Error("Close error")
 		return

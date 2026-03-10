@@ -165,7 +165,7 @@ func TestTaskSocketPool_LoopHeartbeat(t *testing.T) {
 	pool.Close()
 	time.Sleep(time.Second * 1)
 	logStr := stdOut.String()
-	if !strings.Contains(logStr, "loopHeartbeat "+factory.GetAddr()+" quit") {
+	if !strings.Contains(logStr, "taskSocketPool loopHeartbeat "+factory.GetAddr()+" quit") {
 		t.Error("LoopHeartbeat failed")
 	}
 }

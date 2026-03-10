@@ -57,8 +57,11 @@ func (t *Pool) Get() *TaskSocket {
 		case <-t.size:
 			socket := t.factory.Make(t)
 			if socket == nil || socket.IsConnected() == false {
+				log.Error("taskSocketPool " + t.factory.GetAddr() + " new socket failed")
 				t.size <- struct{}{}
+				return nil
 			} else {
+				log.Info("taskSocketPool " + t.factory.GetAddr() + " new socket success")
 				return socket
 			}
 		default:
@@ -80,16 +83,16 @@ wait:
 	}
 }
 
-func (t *Pool) release(taskSocket *TaskSocket) {
-	if taskSocket == nil || !taskSocket.IsConnected() {
+func (t *Pool) release(socket *TaskSocket) {
+	if socket == nil || !socket.IsConnected() {
 		t.size <- struct{}{}
 		return
 	}
-	t.pool <- taskSocket
+	t.pool <- socket
 }
 
 func (t *Pool) heartbeat() {
-	for i := 0; i < cap(t.size); i++ {
+	for i := len(t.pool); i > 0; i-- {
 		select {
 		case <-t.closedCh:
 			return
@@ -98,6 +101,7 @@ func (t *Pool) heartbeat() {
 				t.pool <- socket
 			} else {
 				socket.Close()
+				log.Info("taskSocketPool heartbeat " + t.GetAddr() + " socket closed")
 				t.release(nil)
 			}
 		default:
@@ -110,9 +114,9 @@ func (t *Pool) LoopHeartbeat() {
 	go func() {
 		defer func() {
 			if err := recover(); err != nil {
-				log.Error("loopHeartbeat panic", "err", err)
+				log.Error("taskSocketPool loopHeartbeat panic", "err", err)
 			} else {
-				log.Info("loopHeartbeat " + t.GetAddr() + " quit")
+				log.Info("taskSocketPool loopHeartbeat " + t.GetAddr() + " quit")
 			}
 		}()
 		ticker := time.NewTicker(t.heartbeatInterval)

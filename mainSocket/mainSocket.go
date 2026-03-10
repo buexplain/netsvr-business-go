@@ -61,9 +61,9 @@ func (r *MainSocket) LoopHeartbeat() {
 	go func() {
 		defer func() {
 			if err := recover(); err != nil {
-				log.Error("loopHeartbeat panic", "err", err)
+				log.Error("mainSocket loopHeartbeat panic", "err", err)
 			} else {
-				log.Info("loopHeartbeat " + r.GetAddr() + " quit")
+				log.Info("mainSocket loopHeartbeat " + r.GetAddr() + " quit")
 			}
 		}()
 		t := time.NewTicker(r.heartbeatInterval)
@@ -76,7 +76,9 @@ func (r *MainSocket) LoopHeartbeat() {
 				}
 				return
 			case <-t.C:
-				r.socket.Send(r.heartbeatMessage)
+				if r.socket.IsConnected() {
+					r.socket.Send(r.heartbeatMessage)
+				}
 			}
 		}
 	}()
@@ -86,9 +88,9 @@ func (r *MainSocket) LoopReceive() {
 	go func() {
 		defer func() {
 			if err := recover(); err != nil {
-				log.Error("loopReceive panic", "err", err)
+				log.Error("mainSocket loopReceive panic", "err", err)
 			} else {
-				log.Info("loopReceive " + r.GetAddr() + " quit")
+				log.Info("mainSocket loopReceive " + r.GetAddr() + " quit")
 			}
 		}()
 		for {
@@ -206,6 +208,7 @@ func (r *MainSocket) Unregister() bool {
 	if r.socket.Send(message) {
 		//等待socket收到响应
 		<-r.closedCh
+		log.Info("unregister from "+r.GetAddr()+" success", "connId", r.connId)
 		return true
 	}
 	return false

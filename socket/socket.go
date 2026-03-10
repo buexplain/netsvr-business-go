@@ -127,6 +127,7 @@ func (s *Socket) Send(message []byte) bool {
 			}
 			//短写，继续写入
 			data = data[writeLen:]
+			time.Sleep(time.Millisecond * 10)
 			continue
 		}
 		//写入错误
@@ -139,9 +140,6 @@ func (s *Socket) Send(message []byte) bool {
 			return false
 		}
 		//写入过部分数据，tcp管道已污染，对端已经无法拆包，必须关闭连接
-		if s.IsConnected() {
-			log.Info("send message to " + s.addr + " failed")
-		}
 		s.close()
 		return false
 	}

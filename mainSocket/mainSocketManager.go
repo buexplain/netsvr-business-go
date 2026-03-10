@@ -33,27 +33,6 @@ func NewManager() *Manager {
 	}
 }
 
-func (m *Manager) GetSockets() []*MainSocket {
-	if m.connected.Load() {
-		sockets := make([]*MainSocket, 0, len(m.pool))
-		for _, socket := range m.pool {
-			sockets = append(sockets, socket)
-		}
-		return sockets
-	}
-	return nil
-}
-
-func (m *Manager) GetSocket(addrAsHex string) *MainSocket {
-	if m.connected.Load() {
-		socket, ok := m.pool[addrAsHex]
-		if ok {
-			return socket
-		}
-	}
-	return nil
-}
-
 func (m *Manager) AddSocket(socket *MainSocket) {
 	m.pool[contract.AddrConvertToHex(socket.GetAddr())] = socket
 }

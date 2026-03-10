@@ -60,8 +60,8 @@ func (t *Manger) GetSockets() []*TaskSocket {
 	return ret
 }
 
-func (t *Manger) GetSocket(workerAddrAsHex string) *TaskSocket {
-	pool, ok := t.pools[workerAddrAsHex]
+func (t *Manger) GetSocket(addrAsHex string) *TaskSocket {
+	pool, ok := t.pools[addrAsHex]
 	if !ok {
 		return nil
 	}
