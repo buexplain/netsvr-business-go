@@ -19,31 +19,29 @@ package netsvrBusiness
 import (
 	"encoding/binary"
 	"fmt"
-	"github.com/buexplain/netsvr-business-go/resp"
-	"github.com/buexplain/netsvr-protocol-go/v5/netsvrProtocol"
+	"github.com/buexplain/netsvr-business-go/contract"
+	"github.com/buexplain/netsvr-business-go/log"
+	"github.com/buexplain/netsvr-business-go/ret"
+	"github.com/buexplain/netsvr-business-go/taskSocket"
+	"github.com/buexplain/netsvr-protocol-go/v6/netsvrProtocol"
 	"google.golang.org/protobuf/proto"
 )
 
 type NetBus struct {
-	mainSocketManager    *MainSocketManager
-	taskSocketPoolManger *TaskSocketPoolManger
+	taskSocketPoolManger *taskSocket.Manger
 }
 
-func NewNetBus(mainSocketManager *MainSocketManager, taskSocketPoolManger *TaskSocketPoolManger) *NetBus {
+func NewNetBus(taskSocketPoolManger *taskSocket.Manger) *NetBus {
 	if taskSocketPoolManger == nil {
 		panic("taskSocketPoolManger is nil")
 	}
 	return &NetBus{
-		mainSocketManager:    mainSocketManager,
 		taskSocketPoolManger: taskSocketPoolManger,
 	}
 }
 
 // Close 关闭网关
 func (n *NetBus) Close() {
-	if n.mainSocketManager != nil {
-		n.mainSocketManager.Close()
-	}
 	n.taskSocketPoolManger.Close()
 }
 
@@ -79,14 +77,14 @@ func (n *NetBus) Multicast(uniqIds []string, data []byte) {
 		n.sendToSocketByUniqId(uniqIds[0], message)
 		return
 	}
-	group := n.getUniqIdsGroupByWorkerAddrAsHex(uniqIds)
-	for workerAddrAsHex, currentUniqIds := range group {
+	group := n.getUniqIdsGroupByAddrAsHex(uniqIds)
+	for addrAsHex, currentUniqIds := range group {
 		multicast := netsvrProtocol.Multicast{
 			UniqIds: currentUniqIds,
 			Data:    data,
 		}
 		message := n.pack(netsvrProtocol.Cmd_Multicast, &multicast)
-		n.sendToSocketByWorkerAddrAsHex(workerAddrAsHex, message)
+		n.sendToSocketByAddrAsHex(addrAsHex, message)
 	}
 }
 
@@ -137,8 +135,8 @@ func (n *NetBus) SingleCastBulk(uniqIds []string, data [][]byte) {
 	}
 	bulks := make(map[string]*bulk)
 	for index, uniqId := range uniqIds {
-		workerAddrAsHex := UniqIdConvertToWorkerAddrAsHex(uniqId)
-		if b, ok := bulks[workerAddrAsHex]; ok {
+		addrAsHex := contract.UniqIdConvertToAddrAsHex(uniqId)
+		if b, ok := bulks[addrAsHex]; ok {
 			b.uniqIds = append(b.uniqIds, uniqId)
 			b.data = append(b.data, data[index])
 		} else {
@@ -146,15 +144,15 @@ func (n *NetBus) SingleCastBulk(uniqIds []string, data [][]byte) {
 				uniqIds: []string{uniqId},
 				data:    [][]byte{data[index]},
 			}
-			bulks[workerAddrAsHex] = b
+			bulks[addrAsHex] = b
 		}
 	}
 	//分组完毕，循环发送到各个网关
-	for workerAddrAsHex, b := range bulks {
+	for addrAsHex, b := range bulks {
 		singleCastBulk := netsvrProtocol.SingleCastBulk{}
 		singleCastBulk.Data = b.data
 		singleCastBulk.UniqIds = b.uniqIds
-		n.sendToSocketByWorkerAddrAsHex(workerAddrAsHex, n.pack(netsvrProtocol.Cmd_SingleCastBulk, &singleCastBulk))
+		n.sendToSocketByAddrAsHex(addrAsHex, n.pack(netsvrProtocol.Cmd_SingleCastBulk, &singleCastBulk))
 	}
 }
 
@@ -223,12 +221,12 @@ func (n *NetBus) ForceOffline(uniqIds []string, data []byte) {
 		n.sendToSocketByUniqId(uniqIds[0], n.pack(netsvrProtocol.Cmd_ForceOffline, &forceOffline))
 		return
 	}
-	group := n.getUniqIdsGroupByWorkerAddrAsHex(uniqIds)
-	for workerAddrAsHex, currentUniqIds := range group {
+	group := n.getUniqIdsGroupByAddrAsHex(uniqIds)
+	for addrAsHex, currentUniqIds := range group {
 		forceOffline := netsvrProtocol.ForceOffline{}
 		forceOffline.UniqIds = currentUniqIds
 		forceOffline.Data = data
-		n.sendToSocketByWorkerAddrAsHex(workerAddrAsHex, n.pack(netsvrProtocol.Cmd_ForceOffline, &forceOffline))
+		n.sendToSocketByAddrAsHex(addrAsHex, n.pack(netsvrProtocol.Cmd_ForceOffline, &forceOffline))
 	}
 }
 
@@ -252,386 +250,386 @@ func (n *NetBus) ForceOfflineGuest(uniqIds []string, data []byte, delay int32) {
 		n.sendToSocketByUniqId(uniqIds[0], n.pack(netsvrProtocol.Cmd_ForceOfflineGuest, &forceOfflineGuest))
 		return
 	}
-	group := n.getUniqIdsGroupByWorkerAddrAsHex(uniqIds)
-	for workerAddrAsHex, currentUniqIds := range group {
+	group := n.getUniqIdsGroupByAddrAsHex(uniqIds)
+	for addrAsHex, currentUniqIds := range group {
 		forceOfflineGuest := netsvrProtocol.ForceOfflineGuest{}
 		forceOfflineGuest.UniqIds = currentUniqIds
 		forceOfflineGuest.Data = data
 		forceOfflineGuest.Delay = delay
-		n.sendToSocketByWorkerAddrAsHex(workerAddrAsHex, n.pack(netsvrProtocol.Cmd_ForceOfflineGuest, &forceOfflineGuest))
+		n.sendToSocketByAddrAsHex(addrAsHex, n.pack(netsvrProtocol.Cmd_ForceOfflineGuest, &forceOfflineGuest))
 	}
 }
 
 // CheckOnline 检查目标uniqId是否在线
-func (n *NetBus) CheckOnline(uniqIds []string) *resp.CheckOnlineResp {
-	ret := resp.CheckOnlineResp{Data: make(map[string]*netsvrProtocol.CheckOnlineResp)}
+func (n *NetBus) CheckOnline(uniqIds []string) *ret.CheckOnlineRet {
+	res := ret.CheckOnlineRet{Data: make(map[string]*netsvrProtocol.CheckOnlineResp)}
 	if n.isSinglePoint() || len(uniqIds) == 1 {
-		taskSocket := n.getTaskSocketByUniqId(uniqIds[0])
-		if taskSocket == nil {
-			return &ret
+		socket := n.getTaskSocketByUniqId(uniqIds[0])
+		if socket == nil {
+			return &res
 		}
-		defer taskSocket.Release()
+		defer socket.Release()
 		checkOnlineReq := netsvrProtocol.CheckOnlineReq{}
 		checkOnlineReq.UniqIds = uniqIds
-		taskSocket.Send(n.pack(netsvrProtocol.Cmd_CheckOnline, &checkOnlineReq))
-		respData := taskSocket.Receive()
+		socket.Send(n.pack(netsvrProtocol.Cmd_CheckOnline, &checkOnlineReq))
+		respData := socket.Receive()
 		if respData == nil {
-			logger.Error("call Cmd::CheckOnline failed because the connection to the netsvr was disconnected")
-			return &ret
+			log.Error("call Cmd::CheckOnline failed because the connection to the netsvr was disconnected")
+			return &res
 		}
 		checkOnlineResp := &netsvrProtocol.CheckOnlineResp{}
 		if err := proto.Unmarshal(respData[4:], checkOnlineResp); err != nil {
-			logger.Error("unmarshal netsvrProtocol.CheckOnlineResp failed", "error", err)
-			return &ret
+			log.Error("unmarshal netsvrProtocol.CheckOnlineResp failed", "error", err)
+			return &res
 		}
-		ret.Data[taskSocket.GetWorkerAddr()] = checkOnlineResp
-		return &ret
+		res.Data[socket.GetAddr()] = checkOnlineResp
+		return &res
 	}
-	group := n.getUniqIdsGroupByWorkerAddrAsHex(uniqIds)
-	fn := func(taskSocket *TaskSocket, currentUniqIds []string) {
-		defer taskSocket.Release()
+	group := n.getUniqIdsGroupByAddrAsHex(uniqIds)
+	fn := func(socket *taskSocket.TaskSocket, currentUniqIds []string) {
+		defer socket.Release()
 		checkOnlineReq := netsvrProtocol.CheckOnlineReq{}
 		checkOnlineReq.UniqIds = currentUniqIds
-		taskSocket.Send(n.pack(netsvrProtocol.Cmd_CheckOnline, &checkOnlineReq))
-		respData := taskSocket.Receive()
+		socket.Send(n.pack(netsvrProtocol.Cmd_CheckOnline, &checkOnlineReq))
+		respData := socket.Receive()
 		if respData == nil {
-			logger.Error("call Cmd::CheckOnline failed because the connection to the netsvr was disconnected")
+			log.Error("call Cmd::CheckOnline failed because the connection to the netsvr was disconnected")
 			return
 		}
 		checkOnlineResp := &netsvrProtocol.CheckOnlineResp{}
 		if err := proto.Unmarshal(respData[4:], checkOnlineResp); err != nil {
-			logger.Error("unmarshal netsvrProtocol.CheckOnlineResp failed", "error", err)
+			log.Error("unmarshal netsvrProtocol.CheckOnlineResp failed", "error", err)
 			return
 		}
-		ret.Data[taskSocket.GetWorkerAddr()] = checkOnlineResp
+		res.Data[socket.GetAddr()] = checkOnlineResp
 	}
-	for workerAddrAsHex, currentUniqIds := range group {
-		taskSocket := n.taskSocketPoolManger.GetSocket(workerAddrAsHex)
-		if taskSocket == nil {
+	for addrAsHex, currentUniqIds := range group {
+		socket := n.taskSocketPoolManger.GetSocket(addrAsHex)
+		if socket == nil {
 			continue
 		}
-		fn(taskSocket, currentUniqIds)
+		fn(socket, currentUniqIds)
 	}
-	return &ret
+	return &res
 }
 
 // UniqIdList 获取所有网关中存储的uniqId
-func (n *NetBus) UniqIdList() *resp.UniqIdListResp {
-	ret := resp.UniqIdListResp{Data: make(map[string]*netsvrProtocol.UniqIdListResp)}
+func (n *NetBus) UniqIdList() *ret.UniqIdListRet {
+	res := ret.UniqIdListRet{Data: make(map[string]*netsvrProtocol.UniqIdListResp)}
 	taskSockets := n.taskSocketPoolManger.GetSockets()
 	defer func() {
-		for _, taskSocket := range taskSockets {
-			taskSocket.Release()
+		for _, socket := range taskSockets {
+			socket.Release()
 		}
 	}()
 	message := n.pack(netsvrProtocol.Cmd_UniqIdList, nil)
-	for _, taskSocket := range taskSockets {
-		taskSocket.Send(message)
-		respData := taskSocket.Receive()
+	for _, socket := range taskSockets {
+		socket.Send(message)
+		respData := socket.Receive()
 		if respData == nil {
-			logger.Error("call Cmd::UniqIdList failed because the connection to the netsvr was disconnected")
+			log.Error("call Cmd::UniqIdList failed because the connection to the netsvr was disconnected")
 			continue
 		}
 		uniqIdListResp := &netsvrProtocol.UniqIdListResp{}
 		if err := proto.Unmarshal(respData[4:], uniqIdListResp); err != nil {
-			logger.Error("unmarshal netsvrProtocol.UniqIdListResp failed", "error", err)
+			log.Error("unmarshal netsvrProtocol.UniqIdListResp failed", "error", err)
 			continue
 		}
-		ret.Data[taskSocket.GetWorkerAddr()] = uniqIdListResp
+		res.Data[socket.GetAddr()] = uniqIdListResp
 	}
-	return &ret
+	return &res
 }
 
 // UniqIdCount 获取所有网关中存储的uniqId数量
-func (n *NetBus) UniqIdCount() *resp.UniqIdCountResp {
-	ret := resp.UniqIdCountResp{Data: make(map[string]*netsvrProtocol.UniqIdCountResp)}
+func (n *NetBus) UniqIdCount() *ret.UniqIdCountRet {
+	res := ret.UniqIdCountRet{Data: make(map[string]*netsvrProtocol.UniqIdCountResp)}
 	taskSockets := n.taskSocketPoolManger.GetSockets()
 	defer func() {
-		for _, taskSocket := range taskSockets {
-			taskSocket.Release()
+		for _, socket := range taskSockets {
+			socket.Release()
 		}
 	}()
 	message := n.pack(netsvrProtocol.Cmd_UniqIdCount, nil)
-	for _, taskSocket := range taskSockets {
-		taskSocket.Send(message)
-		respData := taskSocket.Receive()
+	for _, socket := range taskSockets {
+		socket.Send(message)
+		respData := socket.Receive()
 		if respData == nil {
-			logger.Error("call Cmd::UniqIdCount failed because the connection to the netsvr was disconnected")
+			log.Error("call Cmd::UniqIdCount failed because the connection to the netsvr was disconnected")
 			continue
 		}
 		uniqIdCountResp := &netsvrProtocol.UniqIdCountResp{}
 		if err := proto.Unmarshal(respData[4:], uniqIdCountResp); err != nil {
-			logger.Error("unmarshal netsvrProtocol.UniqIdCountResp failed", "error", err)
+			log.Error("unmarshal netsvrProtocol.UniqIdCountResp failed", "error", err)
 			continue
 		}
-		ret.Data[taskSocket.GetWorkerAddr()] = uniqIdCountResp
+		res.Data[socket.GetAddr()] = uniqIdCountResp
 	}
-	return &ret
+	return &res
 }
 
 // TopicCount 获取所有网关中存储的topic数量
-func (n *NetBus) TopicCount() *resp.TopicCountResp {
-	ret := resp.TopicCountResp{Data: make(map[string]*netsvrProtocol.TopicCountResp)}
+func (n *NetBus) TopicCount() *ret.TopicCountRet {
+	res := ret.TopicCountRet{Data: make(map[string]*netsvrProtocol.TopicCountResp)}
 	taskSockets := n.taskSocketPoolManger.GetSockets()
 	defer func() {
-		for _, taskSocket := range taskSockets {
-			taskSocket.Release()
+		for _, socket := range taskSockets {
+			socket.Release()
 		}
 	}()
 	message := n.pack(netsvrProtocol.Cmd_TopicCount, nil)
-	for _, taskSocket := range taskSockets {
-		taskSocket.Send(message)
-		respData := taskSocket.Receive()
+	for _, socket := range taskSockets {
+		socket.Send(message)
+		respData := socket.Receive()
 		if respData == nil {
-			logger.Error("call Cmd::TopicCount failed because the connection to the netsvr was disconnected")
+			log.Error("call Cmd::TopicCount failed because the connection to the netsvr was disconnected")
 			continue
 		}
 		topicCountResp := &netsvrProtocol.TopicCountResp{}
 		if err := proto.Unmarshal(respData[4:], topicCountResp); err != nil {
-			logger.Error("unmarshal netsvrProtocol.TopicCountResp failed", "error", err)
+			log.Error("unmarshal netsvrProtocol.TopicCountResp failed", "error", err)
 			continue
 		}
-		ret.Data[taskSocket.GetWorkerAddr()] = topicCountResp
+		res.Data[socket.GetAddr()] = topicCountResp
 	}
-	return &ret
+	return &res
 }
 
 // TopicList 获取所有网关中存储的topic
-func (n *NetBus) TopicList() *resp.TopicListResp {
-	ret := resp.TopicListResp{Data: make(map[string]*netsvrProtocol.TopicListResp)}
+func (n *NetBus) TopicList() *ret.TopicListRet {
+	res := ret.TopicListRet{Data: make(map[string]*netsvrProtocol.TopicListResp)}
 	taskSockets := n.taskSocketPoolManger.GetSockets()
 	defer func() {
-		for _, taskSocket := range taskSockets {
-			taskSocket.Release()
+		for _, socket := range taskSockets {
+			socket.Release()
 		}
 	}()
 	message := n.pack(netsvrProtocol.Cmd_TopicList, nil)
-	for _, taskSocket := range taskSockets {
-		taskSocket.Send(message)
-		respData := taskSocket.Receive()
+	for _, socket := range taskSockets {
+		socket.Send(message)
+		respData := socket.Receive()
 		if respData == nil {
-			logger.Error("call Cmd::TopicList failed because the connection to the netsvr was disconnected")
+			log.Error("call Cmd::TopicList failed because the connection to the netsvr was disconnected")
 			continue
 		}
 		topicListResp := &netsvrProtocol.TopicListResp{}
 		if err := proto.Unmarshal(respData[4:], topicListResp); err != nil {
-			logger.Error("unmarshal netsvrProtocol.TopicListResp failed", "error", err)
+			log.Error("unmarshal netsvrProtocol.TopicListResp failed", "error", err)
 			continue
 		}
-		ret.Data[taskSocket.GetWorkerAddr()] = topicListResp
+		res.Data[socket.GetAddr()] = topicListResp
 	}
-	return &ret
+	return &res
 }
 
 // TopicUniqIdList 获取所有网关中存储的topic对应的uniqId
-func (n *NetBus) TopicUniqIdList(topics []string) *resp.TopicUniqIdListResp {
-	ret := resp.TopicUniqIdListResp{Data: make(map[string]*netsvrProtocol.TopicUniqIdListResp)}
+func (n *NetBus) TopicUniqIdList(topics []string) *ret.TopicUniqIdListRet {
+	res := ret.TopicUniqIdListRet{Data: make(map[string]*netsvrProtocol.TopicUniqIdListResp)}
 	taskSockets := n.taskSocketPoolManger.GetSockets()
 	defer func() {
-		for _, taskSocket := range taskSockets {
-			taskSocket.Release()
+		for _, socket := range taskSockets {
+			socket.Release()
 		}
 	}()
 	message := n.pack(netsvrProtocol.Cmd_TopicUniqIdList, &netsvrProtocol.TopicUniqIdListReq{Topics: topics})
-	for _, taskSocket := range taskSockets {
-		taskSocket.Send(message)
-		respData := taskSocket.Receive()
+	for _, socket := range taskSockets {
+		socket.Send(message)
+		respData := socket.Receive()
 		if respData == nil {
-			logger.Error("call Cmd::TopicUniqIdList failed because the connection to the netsvr was disconnected")
+			log.Error("call Cmd::TopicUniqIdList failed because the connection to the netsvr was disconnected")
 			continue
 		}
 		topicUniqIdListResp := &netsvrProtocol.TopicUniqIdListResp{}
 		if err := proto.Unmarshal(respData[4:], topicUniqIdListResp); err != nil {
-			logger.Error("unmarshal netsvrProtocol.TopicUniqIdListResp failed", "error", err)
+			log.Error("unmarshal netsvrProtocol.TopicUniqIdListResp failed", "error", err)
 			continue
 		}
-		ret.Data[taskSocket.GetWorkerAddr()] = topicUniqIdListResp
+		res.Data[socket.GetAddr()] = topicUniqIdListResp
 	}
-	return &ret
+	return &res
 }
 
 // TopicUniqIdCount 获取所有网关中存储的topic对应的uniqId数量
-func (n *NetBus) TopicUniqIdCount(topics []string, allTopic bool) *resp.TopicUniqIdCountResp {
-	ret := resp.TopicUniqIdCountResp{Data: make(map[string]*netsvrProtocol.TopicUniqIdCountResp)}
+func (n *NetBus) TopicUniqIdCount(topics []string, allTopic bool) *ret.TopicUniqIdCountRet {
+	res := ret.TopicUniqIdCountRet{Data: make(map[string]*netsvrProtocol.TopicUniqIdCountResp)}
 	taskSockets := n.taskSocketPoolManger.GetSockets()
 	defer func() {
-		for _, taskSocket := range taskSockets {
-			taskSocket.Release()
+		for _, socket := range taskSockets {
+			socket.Release()
 		}
 	}()
 	message := n.pack(netsvrProtocol.Cmd_TopicUniqIdCount, &netsvrProtocol.TopicUniqIdCountReq{
 		Topics:   topics,
 		CountAll: allTopic,
 	})
-	for _, taskSocket := range taskSockets {
-		taskSocket.Send(message)
-		respData := taskSocket.Receive()
+	for _, socket := range taskSockets {
+		socket.Send(message)
+		respData := socket.Receive()
 		if respData == nil {
-			logger.Error("call Cmd::TopicUniqIdCount failed because the connection to the netsvr was disconnected")
+			log.Error("call Cmd::TopicUniqIdCount failed because the connection to the netsvr was disconnected")
 			continue
 		}
 		topicUniqIdCountResp := &netsvrProtocol.TopicUniqIdCountResp{}
 		if err := proto.Unmarshal(respData[4:], topicUniqIdCountResp); err != nil {
-			logger.Error("unmarshal netsvrProtocol.TopicUniqIdCountResp failed", "error", err)
+			log.Error("unmarshal netsvrProtocol.TopicUniqIdCountResp failed", "error", err)
 			continue
 		}
-		ret.Data[taskSocket.GetWorkerAddr()] = topicUniqIdCountResp
+		res.Data[socket.GetAddr()] = topicUniqIdCountResp
 	}
-	return &ret
+	return &res
 }
 
 // TopicCustomerIdList 获取所有网关中存储的topic对应的customerId
-func (n *NetBus) TopicCustomerIdList(topics []string) *resp.TopicCustomerIdListResp {
-	ret := resp.TopicCustomerIdListResp{Data: make(map[string]*netsvrProtocol.TopicCustomerIdListResp)}
+func (n *NetBus) TopicCustomerIdList(topics []string) *ret.TopicCustomerIdListRet {
+	res := ret.TopicCustomerIdListRet{Data: make(map[string]*netsvrProtocol.TopicCustomerIdListResp)}
 	taskSockets := n.taskSocketPoolManger.GetSockets()
 	defer func() {
-		for _, taskSocket := range taskSockets {
-			taskSocket.Release()
+		for _, socket := range taskSockets {
+			socket.Release()
 		}
 	}()
 	message := n.pack(netsvrProtocol.Cmd_TopicCustomerIdList, &netsvrProtocol.TopicCustomerIdListReq{Topics: topics})
-	for _, taskSocket := range taskSockets {
-		taskSocket.Send(message)
-		respData := taskSocket.Receive()
+	for _, socket := range taskSockets {
+		socket.Send(message)
+		respData := socket.Receive()
 		if respData == nil {
-			logger.Error("call Cmd::TopicCustomerIdList failed because the connection to the netsvr was disconnected")
+			log.Error("call Cmd::TopicCustomerIdList failed because the connection to the netsvr was disconnected")
 			continue
 		}
 		topicCustomerIdListResp := &netsvrProtocol.TopicCustomerIdListResp{}
 		if err := proto.Unmarshal(respData[4:], topicCustomerIdListResp); err != nil {
-			logger.Error("unmarshal netsvrProtocol.TopicCustomerIdListResp failed", "error", err)
+			log.Error("unmarshal netsvrProtocol.TopicCustomerIdListResp failed", "error", err)
 			continue
 		}
-		ret.Data[taskSocket.GetWorkerAddr()] = topicCustomerIdListResp
+		res.Data[socket.GetAddr()] = topicCustomerIdListResp
 	}
-	return &ret
+	return &res
 }
 
 // TopicCustomerIdToUniqIdsList 获取所有网关中存储的topic对应的customerId对应的uniqId
-func (n *NetBus) TopicCustomerIdToUniqIdsList(topics []string) *resp.TopicCustomerIdToUniqIdsListResp {
-	ret := resp.TopicCustomerIdToUniqIdsListResp{Data: make(map[string]*netsvrProtocol.TopicCustomerIdToUniqIdsListResp)}
+func (n *NetBus) TopicCustomerIdToUniqIdsList(topics []string) *ret.TopicCustomerIdToUniqIdsListRet {
+	res := ret.TopicCustomerIdToUniqIdsListRet{Data: make(map[string]*netsvrProtocol.TopicCustomerIdToUniqIdsListResp)}
 	taskSockets := n.taskSocketPoolManger.GetSockets()
 	defer func() {
-		for _, taskSocket := range taskSockets {
-			taskSocket.Release()
+		for _, socket := range taskSockets {
+			socket.Release()
 		}
 	}()
 	message := n.pack(netsvrProtocol.Cmd_TopicCustomerIdToUniqIdsList, &netsvrProtocol.TopicCustomerIdToUniqIdsListReq{Topics: topics})
-	for _, taskSocket := range taskSockets {
-		taskSocket.Send(message)
-		respData := taskSocket.Receive()
+	for _, socket := range taskSockets {
+		socket.Send(message)
+		respData := socket.Receive()
 		if respData == nil {
-			logger.Error("call Cmd::TopicCustomerIdToUniqIdsList failed because the connection to the netsvr was disconnected")
+			log.Error("call Cmd::TopicCustomerIdToUniqIdsList failed because the connection to the netsvr was disconnected")
 			continue
 		}
 		topicCustomerIdToUniqIdsListResp := &netsvrProtocol.TopicCustomerIdToUniqIdsListResp{}
 		if err := proto.Unmarshal(respData[4:], topicCustomerIdToUniqIdsListResp); err != nil {
-			logger.Error("unmarshal netsvrProtocol.TopicCustomerIdToUniqIdsListResp failed", "error", err)
+			log.Error("unmarshal netsvrProtocol.TopicCustomerIdToUniqIdsListResp failed", "error", err)
 			continue
 		}
-		ret.Data[taskSocket.GetWorkerAddr()] = topicCustomerIdToUniqIdsListResp
+		res.Data[socket.GetAddr()] = topicCustomerIdToUniqIdsListResp
 	}
-	return &ret
+	return &res
 }
 
 // TopicCustomerIdCount 获取所有网关中存储的topic对应的customerId数量
-func (n *NetBus) TopicCustomerIdCount(topics []string, allTopic bool) *resp.TopicCustomerIdCountResp {
-	ret := resp.TopicCustomerIdCountResp{Data: make(map[string]*netsvrProtocol.TopicCustomerIdCountResp)}
+func (n *NetBus) TopicCustomerIdCount(topics []string, allTopic bool) *ret.TopicCustomerIdCountRet {
+	res := ret.TopicCustomerIdCountRet{Data: make(map[string]*netsvrProtocol.TopicCustomerIdCountResp)}
 	taskSockets := n.taskSocketPoolManger.GetSockets()
 	defer func() {
-		for _, taskSocket := range taskSockets {
-			taskSocket.Release()
+		for _, socket := range taskSockets {
+			socket.Release()
 		}
 	}()
 	message := n.pack(netsvrProtocol.Cmd_TopicCustomerIdCount, &netsvrProtocol.TopicCustomerIdCountReq{
 		Topics:   topics,
 		CountAll: allTopic,
 	})
-	for _, taskSocket := range taskSockets {
-		taskSocket.Send(message)
-		respData := taskSocket.Receive()
+	for _, socket := range taskSockets {
+		socket.Send(message)
+		respData := socket.Receive()
 		if respData == nil {
-			logger.Error("call Cmd::TopicCustomerIdCount failed because the connection to the netsvr was disconnected")
+			log.Error("call Cmd::TopicCustomerIdCount failed because the connection to the netsvr was disconnected")
 			continue
 		}
 		topicCustomerIdCountResp := &netsvrProtocol.TopicCustomerIdCountResp{}
 		if err := proto.Unmarshal(respData[4:], topicCustomerIdCountResp); err != nil {
-			logger.Error("unmarshal netsvrProtocol.TopicCustomerIdCountResp failed", "error", err)
+			log.Error("unmarshal netsvrProtocol.TopicCustomerIdCountResp failed", "error", err)
 			continue
 		}
-		ret.Data[taskSocket.GetWorkerAddr()] = topicCustomerIdCountResp
+		res.Data[socket.GetAddr()] = topicCustomerIdCountResp
 	}
-	return &ret
+	return &res
 }
 
 // ConnInfo 获取所有网关中存储的连接信息
-func (n *NetBus) ConnInfo(uniqIds []string, reqCustomerId bool, reqSession bool, reqTopic bool) *resp.ConnInfoResp {
-	ret := resp.ConnInfoResp{Data: make(map[string]*netsvrProtocol.ConnInfoResp)}
+func (n *NetBus) ConnInfo(uniqIds []string, reqCustomerId bool, reqSession bool, reqTopic bool) *ret.ConnInfoRet {
+	res := ret.ConnInfoRet{Data: make(map[string]*netsvrProtocol.ConnInfoResp)}
 	if n.isSinglePoint() || len(uniqIds) == 1 {
-		taskSocket := n.getTaskSocketByUniqId(uniqIds[0])
-		if taskSocket == nil {
-			return &ret
+		socket := n.getTaskSocketByUniqId(uniqIds[0])
+		if socket == nil {
+			return &res
 		}
-		defer taskSocket.Release()
+		defer socket.Release()
 		connInfoReq := netsvrProtocol.ConnInfoReq{
 			UniqIds:       uniqIds,
 			ReqCustomerId: reqCustomerId,
 			ReqSession:    reqSession,
 			ReqTopic:      reqTopic,
 		}
-		taskSocket.Send(n.pack(netsvrProtocol.Cmd_ConnInfo, &connInfoReq))
-		respData := taskSocket.Receive()
+		socket.Send(n.pack(netsvrProtocol.Cmd_ConnInfo, &connInfoReq))
+		respData := socket.Receive()
 		if respData == nil {
-			logger.Error("call Cmd::ConnInfo failed because the connection to the netsvr was disconnected")
-			return &ret
+			log.Error("call Cmd::ConnInfo failed because the connection to the netsvr was disconnected")
+			return &res
 		}
 		connInfoResp := &netsvrProtocol.ConnInfoResp{}
 		if err := proto.Unmarshal(respData[4:], connInfoResp); err != nil {
-			logger.Error("unmarshal netsvrProtocol.ConnInfoResp failed", "error", err)
-			return &ret
+			log.Error("unmarshal netsvrProtocol.ConnInfoResp failed", "error", err)
+			return &res
 		}
-		ret.Data[taskSocket.GetWorkerAddr()] = connInfoResp
-		return &ret
+		res.Data[socket.GetAddr()] = connInfoResp
+		return &res
 	}
-	group := n.getUniqIdsGroupByWorkerAddrAsHex(uniqIds)
-	fn := func(taskSocket *TaskSocket, currentUniqIds []string) {
-		defer taskSocket.Release()
+	group := n.getUniqIdsGroupByAddrAsHex(uniqIds)
+	fn := func(socket *taskSocket.TaskSocket, currentUniqIds []string) {
+		defer socket.Release()
 		connInfoReq := netsvrProtocol.ConnInfoReq{
 			UniqIds:       currentUniqIds,
 			ReqCustomerId: reqCustomerId,
 			ReqSession:    reqSession,
 			ReqTopic:      reqTopic,
 		}
-		taskSocket.Send(n.pack(netsvrProtocol.Cmd_ConnInfo, &connInfoReq))
-		respData := taskSocket.Receive()
+		socket.Send(n.pack(netsvrProtocol.Cmd_ConnInfo, &connInfoReq))
+		respData := socket.Receive()
 		if respData == nil {
-			logger.Error("call Cmd::ConnInfo failed because the connection to the netsvr was disconnected")
+			log.Error("call Cmd::ConnInfo failed because the connection to the netsvr was disconnected")
 			return
 		}
 		connInfoResp := &netsvrProtocol.ConnInfoResp{}
 		if err := proto.Unmarshal(respData[4:], connInfoResp); err != nil {
-			logger.Error("unmarshal netsvrProtocol.ConnInfoResp failed", "error", err)
+			log.Error("unmarshal netsvrProtocol.ConnInfoResp failed", "error", err)
 			return
 		}
-		ret.Data[taskSocket.GetWorkerAddr()] = connInfoResp
+		res.Data[socket.GetAddr()] = connInfoResp
 	}
-	for workerAddrAsHex, currentUniqIds := range group {
-		taskSocket := n.taskSocketPoolManger.GetSocket(workerAddrAsHex)
-		if taskSocket == nil {
+	for addrAsHex, currentUniqIds := range group {
+		socket := n.taskSocketPoolManger.GetSocket(addrAsHex)
+		if socket == nil {
 			continue
 		}
-		fn(taskSocket, currentUniqIds)
+		fn(socket, currentUniqIds)
 	}
-	return &ret
+	return &res
 }
 
 // ConnInfoByCustomerId 根据customerId获取所有网关中存储的连接信息
-func (n *NetBus) ConnInfoByCustomerId(customerIds []string, reqUniqId bool, reqSession bool, reqTopic bool) *resp.ConnInfoByCustomerIdResp {
-	ret := resp.ConnInfoByCustomerIdResp{Data: make(map[string]*netsvrProtocol.ConnInfoByCustomerIdResp)}
+func (n *NetBus) ConnInfoByCustomerId(customerIds []string, reqUniqId bool, reqSession bool, reqTopic bool) *ret.ConnInfoByCustomerIdRet {
+	res := ret.ConnInfoByCustomerIdRet{Data: make(map[string]*netsvrProtocol.ConnInfoByCustomerIdResp)}
 	taskSockets := n.taskSocketPoolManger.GetSockets()
 	defer func() {
-		for _, taskSocket := range taskSockets {
-			taskSocket.Release()
+		for _, socket := range taskSockets {
+			socket.Release()
 		}
 	}()
 	message := n.pack(netsvrProtocol.Cmd_ConnInfoByCustomerId, &netsvrProtocol.ConnInfoByCustomerIdReq{
@@ -640,215 +638,186 @@ func (n *NetBus) ConnInfoByCustomerId(customerIds []string, reqUniqId bool, reqS
 		ReqSession:  reqSession,
 		ReqTopic:    reqTopic,
 	})
-	for _, taskSocket := range taskSockets {
-		taskSocket.Send(message)
-		respData := taskSocket.Receive()
+	for _, socket := range taskSockets {
+		socket.Send(message)
+		respData := socket.Receive()
 		if respData == nil {
-			logger.Error("call Cmd::ConnInfoByCustomerId failed because the connection to the netsvr was disconnected")
+			log.Error("call Cmd::ConnInfoByCustomerId failed because the connection to the netsvr was disconnected")
 			continue
 		}
 		connInfoByCustomerIdResp := &netsvrProtocol.ConnInfoByCustomerIdResp{}
 		if err := proto.Unmarshal(respData[4:], connInfoByCustomerIdResp); err != nil {
-			logger.Error("unmarshal netsvrProtocol.ConnInfoByCustomerIdResp failed", "error", err)
+			log.Error("unmarshal netsvrProtocol.ConnInfoByCustomerIdResp failed", "error", err)
 			continue
 		}
-		ret.Data[taskSocket.GetWorkerAddr()] = connInfoByCustomerIdResp
+		res.Data[socket.GetAddr()] = connInfoByCustomerIdResp
 	}
-	return &ret
+	return &res
 }
 
 // Metrics 获取所有网关的统计信息
-func (n *NetBus) Metrics() *resp.MetricsResp {
-	ret := resp.MetricsResp{Data: make(map[string]*netsvrProtocol.MetricsResp)}
+func (n *NetBus) Metrics() *ret.MetricsRet {
+	res := ret.MetricsRet{Data: make(map[string]*netsvrProtocol.MetricsResp)}
 	taskSockets := n.taskSocketPoolManger.GetSockets()
 	defer func() {
-		for _, taskSocket := range taskSockets {
-			taskSocket.Release()
+		for _, socket := range taskSockets {
+			socket.Release()
 		}
 	}()
 	message := n.pack(netsvrProtocol.Cmd_Metrics, nil)
-	for _, taskSocket := range taskSockets {
-		taskSocket.Send(message)
-		respData := taskSocket.Receive()
+	for _, socket := range taskSockets {
+		socket.Send(message)
+		respData := socket.Receive()
 		if respData == nil {
-			logger.Error("call Cmd::Metrics failed because the connection to the netsvr was disconnected")
+			log.Error("call Cmd::Metrics failed because the connection to the netsvr was disconnected")
 			continue
 		}
 		metricsResp := &netsvrProtocol.MetricsResp{}
 		if err := proto.Unmarshal(respData[4:], metricsResp); err != nil {
-			logger.Error("unmarshal netsvrProtocol.MetricsResp failed", "error", err)
+			log.Error("unmarshal netsvrProtocol.MetricsResp failed", "error", err)
 			continue
 		}
-		ret.Data[taskSocket.GetWorkerAddr()] = metricsResp
+		res.Data[socket.GetAddr()] = metricsResp
 	}
-	return &ret
+	return &res
 }
 
 // Limit 设置或读取网关针对business的每秒转发数量的限制的配置
-func (n *NetBus) Limit(limitReq *netsvrProtocol.LimitReq, workerAddr string) *resp.LimitResp {
-	ret := resp.LimitResp{Data: make(map[string]*netsvrProtocol.LimitResp)}
-	var taskSockets []*TaskSocket
-	if workerAddr == "" {
+func (n *NetBus) Limit(limitReq *netsvrProtocol.LimitReq, addr string) *ret.LimitRet {
+	res := ret.LimitRet{Data: make(map[string]*netsvrProtocol.LimitResp)}
+	var taskSockets []*taskSocket.TaskSocket
+	if addr == "" {
 		taskSockets = n.taskSocketPoolManger.GetSockets()
 	} else {
-		workerAddrAsHex := WorkerAddrConvertToHex(workerAddr)
-		taskSocket := n.taskSocketPoolManger.GetSocket(workerAddrAsHex)
-		if taskSocket == nil {
+		addrAsHex := contract.AddrConvertToHex(addr)
+		socket := n.taskSocketPoolManger.GetSocket(addrAsHex)
+		if socket == nil {
 			return nil
 		}
-		taskSockets = []*TaskSocket{taskSocket}
+		taskSockets = []*taskSocket.TaskSocket{socket}
 	}
 	defer func() {
-		for _, taskSocket := range taskSockets {
-			taskSocket.Release()
+		for _, socket := range taskSockets {
+			socket.Release()
 		}
 	}()
 	message := n.pack(netsvrProtocol.Cmd_Limit, limitReq)
-	for _, taskSocket := range taskSockets {
-		taskSocket.Send(message)
-		respData := taskSocket.Receive()
+	for _, socket := range taskSockets {
+		socket.Send(message)
+		respData := socket.Receive()
 		if respData == nil {
-			logger.Error("call Cmd::Limit failed because the connection to the netsvr was disconnected")
+			log.Error("call Cmd::Limit failed because the connection to the netsvr was disconnected")
 			continue
 		}
 		limitResp := &netsvrProtocol.LimitResp{}
 		if err := proto.Unmarshal(respData[4:], limitResp); err != nil {
-			logger.Error("unmarshal netsvrProtocol.LimitResp failed", "error", err)
+			log.Error("unmarshal netsvrProtocol.LimitResp failed", "error", err)
 			continue
 		}
-		ret.Data[taskSocket.GetWorkerAddr()] = limitResp
+		res.Data[socket.GetAddr()] = limitResp
 	}
-	return &ret
+	return &res
 }
 
 // CustomerIdList 获取所有网关的customerId列表
-func (n *NetBus) CustomerIdList() *resp.CustomerIdListResp {
-	ret := resp.CustomerIdListResp{Data: make(map[string]*netsvrProtocol.CustomerIdListResp)}
+func (n *NetBus) CustomerIdList() *ret.CustomerIdListRet {
+	res := ret.CustomerIdListRet{Data: make(map[string]*netsvrProtocol.CustomerIdListResp)}
 	taskSockets := n.taskSocketPoolManger.GetSockets()
 	defer func() {
-		for _, taskSocket := range taskSockets {
-			taskSocket.Release()
+		for _, socket := range taskSockets {
+			socket.Release()
 		}
 	}()
 	message := n.pack(netsvrProtocol.Cmd_CustomerIdList, nil)
-	for _, taskSocket := range taskSockets {
-		taskSocket.Send(message)
-		respData := taskSocket.Receive()
+	for _, socket := range taskSockets {
+		socket.Send(message)
+		respData := socket.Receive()
 		if respData == nil {
-			logger.Error("call Cmd::CustomerIdList failed because the connection to the netsvr was disconnected")
+			log.Error("call Cmd::CustomerIdList failed because the connection to the netsvr was disconnected")
 			continue
 		}
 		customerIdListResp := &netsvrProtocol.CustomerIdListResp{}
 		if err := proto.Unmarshal(respData[4:], customerIdListResp); err != nil {
-			logger.Error("unmarshal netsvrProtocol.CustomerIdListResp failed", "error", err)
+			log.Error("unmarshal netsvrProtocol.CustomerIdListResp failed", "error", err)
 			continue
 		}
-		ret.Data[taskSocket.GetWorkerAddr()] = customerIdListResp
+		res.Data[socket.GetAddr()] = customerIdListResp
 	}
-	return &ret
+	return &res
 }
 
 // CustomerIdCount 统计网关的在线客户数，注意各个网关的客户数之和不一定等于总在线客户数，因为可能一个客户有多个设备连接到不同网关
-func (n *NetBus) CustomerIdCount() *resp.CustomerIdCountResp {
-	ret := resp.CustomerIdCountResp{Data: make(map[string]*netsvrProtocol.CustomerIdCountResp)}
+func (n *NetBus) CustomerIdCount() *ret.CustomerIdCountRet {
+	res := ret.CustomerIdCountRet{Data: make(map[string]*netsvrProtocol.CustomerIdCountResp)}
 	taskSockets := n.taskSocketPoolManger.GetSockets()
 	defer func() {
-		for _, taskSocket := range taskSockets {
-			taskSocket.Release()
+		for _, socket := range taskSockets {
+			socket.Release()
 		}
 	}()
 	message := n.pack(netsvrProtocol.Cmd_CustomerIdCount, nil)
-	for _, taskSocket := range taskSockets {
-		taskSocket.Send(message)
-		respData := taskSocket.Receive()
+	for _, socket := range taskSockets {
+		socket.Send(message)
+		respData := socket.Receive()
 		if respData == nil {
-			logger.Error("call Cmd::CustomerIdCount failed because the connection to the netsvr was disconnected")
+			log.Error("call Cmd::CustomerIdCount failed because the connection to the netsvr was disconnected")
 			continue
 		}
 		customerIdCountResp := &netsvrProtocol.CustomerIdCountResp{}
 		if err := proto.Unmarshal(respData[4:], customerIdCountResp); err != nil {
-			logger.Error("unmarshal netsvrProtocol.CustomerIdCountResp failed", "error", err)
+			log.Error("unmarshal netsvrProtocol.CustomerIdCountResp failed", "error", err)
 			continue
 		}
-		ret.Data[taskSocket.GetWorkerAddr()] = customerIdCountResp
+		res.Data[socket.GetAddr()] = customerIdCountResp
 	}
-	return &ret
+	return &res
 }
 
 func (n *NetBus) sendToSockets(data []byte) {
-	//优先用mainSocket发送，因为mainSocket是异步发送的，而且网关可以为mainSocket开启多条协程处理这些信息
-	if n.mainSocketManager != nil {
-		mainSockets := n.mainSocketManager.GetSockets()
-		if len(mainSockets) > 0 {
-			for _, mainSocket := range mainSockets {
-				mainSocket.Send(data)
-			}
-			return
-		}
-	}
-	//如果mainSocket不存在，再通过taskSocket发送
 	taskSockets := n.taskSocketPoolManger.GetSockets()
 	defer func() {
-		for _, taskSocket := range taskSockets {
-			taskSocket.Release()
+		for _, socket := range taskSockets {
+			socket.Release()
 		}
 	}()
-	for _, taskSocket := range taskSockets {
-		taskSocket.Send(data)
+	for _, socket := range taskSockets {
+		socket.Send(data)
 	}
 }
 
 func (n *NetBus) sendToSocketByUniqId(uniqId string, data []byte) {
-	//优先用mainSocket发送，因为mainSocket是异步发送的，而且网关可以为mainSocket开启多条协程处理这些信息
-	if n.mainSocketManager != nil {
-		mainSocket := n.mainSocketManager.GetSocket(UniqIdConvertToWorkerAddrAsHex(uniqId))
-		if mainSocket != nil {
-			mainSocket.Send(data)
-			return
-		}
-	}
-	//如果mainSocket不存在，再通过taskSocket发送
-	taskSocket := n.taskSocketPoolManger.GetSocket(UniqIdConvertToWorkerAddrAsHex(uniqId))
-	if taskSocket != nil {
-		defer taskSocket.Release()
-		taskSocket.Send(data)
+	socket := n.taskSocketPoolManger.GetSocket(contract.UniqIdConvertToAddrAsHex(uniqId))
+	if socket != nil {
+		defer socket.Release()
+		socket.Send(data)
 		return
 	}
 }
 
-func (n *NetBus) sendToSocketByWorkerAddrAsHex(workerAddrAsHex string, data []byte) {
-	//优先用mainSocket发送，因为mainSocket是异步发送的，而且网关可以为mainSocket开启多条协程处理这些信息
-	if n.mainSocketManager != nil {
-		mainSocket := n.mainSocketManager.GetSocket(workerAddrAsHex)
-		if mainSocket != nil {
-			mainSocket.Send(data)
-			return
-		}
-	}
-	//如果mainSocket不存在，再通过taskSocket发送
-	taskSocket := n.taskSocketPoolManger.GetSocket(workerAddrAsHex)
-	if taskSocket != nil {
-		defer taskSocket.Release()
-		taskSocket.Send(data)
+func (n *NetBus) sendToSocketByAddrAsHex(addrAsHex string, data []byte) {
+	socket := n.taskSocketPoolManger.GetSocket(addrAsHex)
+	if socket != nil {
+		defer socket.Release()
+		socket.Send(data)
 	}
 }
 
-func (n *NetBus) getTaskSocketByUniqId(uniqId string) *TaskSocket {
-	return n.taskSocketPoolManger.GetSocket(UniqIdConvertToWorkerAddrAsHex(uniqId))
+func (n *NetBus) getTaskSocketByUniqId(uniqId string) *taskSocket.TaskSocket {
+	return n.taskSocketPoolManger.GetSocket(contract.UniqIdConvertToAddrAsHex(uniqId))
 }
 
 func (n *NetBus) isSinglePoint() bool {
 	return n.taskSocketPoolManger.Count() == 1
 }
 
-// getUniqIdsGroupByWorkerAddrAsHex 根据uniqId列表分组，返回每个workerAddrAsHex对应的uniqId列表
-func (n *NetBus) getUniqIdsGroupByWorkerAddrAsHex(uniqIds []string) map[string][]string {
-	ret := make(map[string][]string)
+// getUniqIdsGroupByAddrAsHex 根据uniqId列表分组，返回每个addrAsHex对应的uniqId列表
+func (n *NetBus) getUniqIdsGroupByAddrAsHex(uniqIds []string) map[string][]string {
+	res := make(map[string][]string)
 	for _, uniqId := range uniqIds {
-		workerAddrAsHex := UniqIdConvertToWorkerAddrAsHex(uniqId)
-		ret[workerAddrAsHex] = append(ret[workerAddrAsHex], uniqId)
+		addrAsHex := contract.UniqIdConvertToAddrAsHex(uniqId)
+		res[addrAsHex] = append(res[addrAsHex], uniqId)
 	}
-	return ret
+	return res
 }
 
 func (n *NetBus) pack(cmd netsvrProtocol.Cmd, req proto.Message) []byte {
@@ -860,7 +829,7 @@ func (n *NetBus) pack(cmd netsvrProtocol.Cmd, req proto.Message) []byte {
 	var err error
 	data, err = (proto.MarshalOptions{}).MarshalAppend(data, req)
 	if err != nil {
-		logger.Error(fmt.Sprintf("Proto marshal %T failed", req), "error", err)
+		log.Error(fmt.Sprintf("Proto marshal %T failed", req), "error", err)
 		return nil
 	}
 	return data
