@@ -19,7 +19,7 @@ package contract
 import "testing"
 
 func TestFunc_AddrConvertToHex(t *testing.T) {
-	if AddrConvertToHex("127.0.0.1:6061") != "7f000001" {
-		t.Error("worker、task服务器监听的ip地址转为16进制字符串失败")
+	if AddrConvertToHex("127.0.0.1:6061") != "7f00000117ad" {
+		t.Error("task服务器监听的ip地址转为16进制字符串失败")
 	}
 }
