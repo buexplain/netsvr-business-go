@@ -39,5 +39,9 @@ func AddrConvertToHex(addr string) string {
 
 // UniqIdConvertToAddrAsHex 将uniqId转为网关的task服务器监听的ip地址的16进制字符串
 func UniqIdConvertToAddrAsHex(uniqId string) string {
+	if len(uniqId) != 28 {
+		//网关分配给连接的唯一id，格式是：网关进程的task服务监听的ip地址(4字节)+网关进程的task服务监听的port(2字节)+时间戳(4字节)+自增id(4字节)，共14字节，28个16进制的字符
+		return ""
+	}
 	return uniqId[0:12]
 }
