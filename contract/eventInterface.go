@@ -17,11 +17,16 @@
 package contract
 
 import (
-	"github.com/buexplain/netsvr-protocol-go/v6/netsvrProtocol"
+	"github.com/buexplain/netsvr-protocol-go/v7/netsvrProtocol"
 )
 
+// EventInterface 业务进程实现该接口以接收网关转发的事件。
+// 三个方法的入参为协议生成类型，直接按字段读取即可。
 type EventInterface interface {
+	// OnOpen 连接打开事件
 	OnOpen(connOpen *netsvrProtocol.ConnOpen)
+	// OnMessage 连接收到消息事件
 	OnMessage(transfer *netsvrProtocol.Transfer)
+	// OnClose 连接关闭事件
 	OnClose(connClose *netsvrProtocol.ConnClose)
 }

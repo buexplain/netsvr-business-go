@@ -17,9 +17,10 @@
 package ret
 
 import (
-	"github.com/buexplain/netsvr-protocol-go/v6/netsvrProtocol"
+	"github.com/buexplain/netsvr-protocol-go/v7/netsvrProtocol"
 )
 
+// TopicUniqIdCountRet 统计某几个主题包含的连接数的结果（去重统计），key是网关地址，value是该网关返回的响应
 type TopicUniqIdCountRet struct {
 	Data map[string]*netsvrProtocol.TopicUniqIdCountResp
 }

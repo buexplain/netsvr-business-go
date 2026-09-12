@@ -17,7 +17,7 @@
 package mainSocket
 
 import (
-	"github.com/buexplain/netsvr-business-go/v2/contract"
+	"github.com/buexplain/netsvr-business-go/v3/contract"
 	"testing"
 )
 

@@ -17,9 +17,10 @@
 package ret
 
 import (
-	"github.com/buexplain/netsvr-protocol-go/v6/netsvrProtocol"
+	"github.com/buexplain/netsvr-protocol-go/v7/netsvrProtocol"
 )
 
+// TopicListRet 获取网关全部主题的结果，key是网关地址，value是该网关返回的响应
 type TopicListRet struct {
 	Data map[string]*netsvrProtocol.TopicListResp
 }

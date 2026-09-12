@@ -17,14 +17,15 @@
 package ret
 
 import (
-	"github.com/buexplain/netsvr-protocol-go/v6/netsvrProtocol"
+	"github.com/buexplain/netsvr-protocol-go/v7/netsvrProtocol"
 )
 
+// UniqIdCountRet 统计在线连接数的结果，key是网关地址，value是该网关返回的响应
 type UniqIdCountRet struct {
 	Data map[string]*netsvrProtocol.UniqIdCountResp
 }
 
-// Count 获取总数量
+// Count 全部网关在线连接数之和
 func (u *UniqIdCountRet) Count() int32 {
 	var ret int32
 	for _, v := range u.Data {

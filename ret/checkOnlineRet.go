@@ -17,14 +17,16 @@
 package ret
 
 import (
-	"github.com/buexplain/netsvr-protocol-go/v6/netsvrProtocol"
+	"github.com/buexplain/netsvr-protocol-go/v7/netsvrProtocol"
 	"slices"
 )
 
+// CheckOnlineRet 检查uniqId是否在线的结果，key是网关地址，value是该网关返回的响应
 type CheckOnlineRet struct {
 	Data map[string]*netsvrProtocol.CheckOnlineResp
 }
 
+// Has 判断某个uniqId是否在线，任意一个网关在线即为在线
 func (c *CheckOnlineRet) Has(uniqId string) bool {
 	for _, v := range c.Data {
 		if slices.Contains(v.UniqIds, uniqId) {

@@ -17,15 +17,17 @@
 package ret
 
 import (
-	"github.com/buexplain/netsvr-protocol-go/v6/netsvrProtocol"
+	"github.com/buexplain/netsvr-protocol-go/v7/netsvrProtocol"
 )
 
+// ConnInfoRet 获取uniqId连接信息的结果，key是网关地址，value是该网关返回的响应
 type ConnInfoRet struct {
 	Data map[string]*netsvrProtocol.ConnInfoResp
 }
 
+// ToMap 合并所有网关的结果，key是uniqId，value是连接信息
 func (c *ConnInfoRet) ToMap() map[string]*netsvrProtocol.ConnInfoRespItem {
-	ret := make(map[string]*netsvrProtocol.ConnInfoRespItem, len(c.Data))
+	ret := make(map[string]*netsvrProtocol.ConnInfoRespItem)
 	for _, v := range c.Data {
 		for uniqId, item := range v.Items {
 			ret[uniqId] = item

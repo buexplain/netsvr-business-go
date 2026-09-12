@@ -17,9 +17,10 @@
 package ret
 
 import (
-	"github.com/buexplain/netsvr-protocol-go/v6/netsvrProtocol"
+	"github.com/buexplain/netsvr-protocol-go/v7/netsvrProtocol"
 )
 
+// TopicCustomerIdListRet 获取某几个主题的customerId的结果，key是网关地址，value是该网关返回的响应
 type TopicCustomerIdListRet struct {
 	Data map[string]*netsvrProtocol.TopicCustomerIdListResp
 }

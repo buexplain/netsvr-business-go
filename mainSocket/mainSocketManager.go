@@ -17,15 +17,17 @@
 package mainSocket
 
 import (
-	"github.com/buexplain/netsvr-business-go/v2/contract"
+	"github.com/buexplain/netsvr-business-go/v3/contract"
 	"sync/atomic"
 )
 
+// Manager 长连接管理器，统一管理到各网关的 MainSocket
 type Manager struct {
 	pool      map[string]*MainSocket
 	connected atomic.Bool
 }
 
+// NewManager 创建一个长连接管理器
 func NewManager() *Manager {
 	return &Manager{
 		pool:      make(map[string]*MainSocket),
@@ -33,6 +35,7 @@ func NewManager() *Manager {
 	}
 }
 
+// AddSocket 按长连接的网关地址注册它
 func (m *Manager) AddSocket(socket *MainSocket) {
 	m.pool[contract.AddrConvertToHex(socket.GetAddr())] = socket
 }
@@ -79,6 +82,8 @@ func (m *Manager) register() bool {
 	return true
 }
 
+// Start 连接并注册所有长连接，然后启动收发与心跳；任一步失败会回滚已建立的连接并返回 false。
+// 重复调用是幂等的（已启动时直接返回 true）
 func (m *Manager) Start() bool {
 	if m.connected.CompareAndSwap(false, true) == false {
 		return true
@@ -87,6 +92,7 @@ func (m *Manager) Start() bool {
 	return m.connected.Load()
 }
 
+// Close 注销并关闭所有长连接
 func (m *Manager) Close() {
 	if m.connected.CompareAndSwap(true, false) == false {
 		return

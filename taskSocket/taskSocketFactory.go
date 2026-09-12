@@ -18,6 +18,7 @@ package taskSocket
 
 import "time"
 
+// Factory 创建 TaskSocket 的工厂，绑定目标网关地址与各阶段超时
 type Factory struct {
 	addr           string
 	receiveTimeout time.Duration
@@ -25,6 +26,7 @@ type Factory struct {
 	connectTimeout time.Duration
 }
 
+// NewFactory 创建一个 task 连接工厂
 func NewFactory(addr string, receiveTimeout time.Duration, sendTimeout time.Duration, connectTimeout time.Duration) *Factory {
 	return &Factory{
 		addr:           addr,
@@ -34,6 +36,7 @@ func NewFactory(addr string, receiveTimeout time.Duration, sendTimeout time.Dura
 	}
 }
 
+// Make 创建一个 TaskSocket 并立即建立连接，连接失败返回 nil
 func (t *Factory) Make(pool *Pool) *TaskSocket {
 	socket := New(t.addr, t.receiveTimeout, t.sendTimeout, t.connectTimeout, pool)
 	if socket.Connect() {
@@ -42,6 +45,7 @@ func (t *Factory) Make(pool *Pool) *TaskSocket {
 	return nil
 }
 
+// GetAddr 获取工厂对应的网关地址
 func (t *Factory) GetAddr() string {
 	return t.addr
 }

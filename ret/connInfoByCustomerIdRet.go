@@ -17,9 +17,10 @@
 package ret
 
 import (
-	"github.com/buexplain/netsvr-protocol-go/v6/netsvrProtocol"
+	"github.com/buexplain/netsvr-protocol-go/v7/netsvrProtocol"
 )
 
+// ConnInfoByCustomerIdRet 获取customerId连接信息的结果，key是网关地址，value是该网关返回的响应
 type ConnInfoByCustomerIdRet struct {
 	Data map[string]*netsvrProtocol.ConnInfoByCustomerIdResp
 }

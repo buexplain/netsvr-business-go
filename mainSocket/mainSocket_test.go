@@ -17,10 +17,10 @@
 package mainSocket
 
 import (
-	"github.com/buexplain/netsvr-business-go/v2/contract"
-	"github.com/buexplain/netsvr-business-go/v2/log"
-	"github.com/buexplain/netsvr-business-go/v2/socket"
-	"github.com/buexplain/netsvr-protocol-go/v6/netsvrProtocol"
+	"github.com/buexplain/netsvr-business-go/v3/contract"
+	"github.com/buexplain/netsvr-business-go/v3/log"
+	"github.com/buexplain/netsvr-business-go/v3/socket"
+	"github.com/buexplain/netsvr-protocol-go/v7/netsvrProtocol"
 	"google.golang.org/protobuf/encoding/protojson"
 	"testing"
 	"time"

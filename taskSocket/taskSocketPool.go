@@ -17,10 +17,11 @@
 package taskSocket
 
 import (
-	"github.com/buexplain/netsvr-business-go/v2/log"
+	"github.com/buexplain/netsvr-business-go/v3/log"
 	"time"
 )
 
+// Pool 单个网关的 task 连接池，负责连接的创建、复用与心跳保活
 type Pool struct {
 	pool              chan *TaskSocket
 	size              chan struct{}
@@ -31,6 +32,7 @@ type Pool struct {
 	closedCh          chan struct{}
 }
 
+// NewPool 创建连接池，size 为最大连接数；waitTimeout 为取连接等待超时，为 0 表示一直等待
 func NewPool(size int, factory *Factory, waitTimeout time.Duration, heartbeatInterval time.Duration, heartbeatMessage []byte) *Pool {
 	tmp := &Pool{}
 	tmp.factory = factory
@@ -47,10 +49,12 @@ func NewPool(size int, factory *Factory, waitTimeout time.Duration, heartbeatInt
 	return tmp
 }
 
+// GetAddr 获取连接池对应的网关地址
 func (t *Pool) GetAddr() string {
 	return t.factory.GetAddr()
 }
 
+// Get 取出一个可用连接；池内无空闲且已达上限时，等待 waitTimeout 后返回 nil
 func (t *Pool) Get() *TaskSocket {
 	if len(t.pool) == 0 {
 		select {
@@ -110,6 +114,7 @@ func (t *Pool) heartbeat() {
 	}
 }
 
+// LoopHeartbeat 启动心跳协程，按 heartbeatInterval 定期给池内连接发送心跳
 func (t *Pool) LoopHeartbeat() {
 	go func() {
 		defer func() {
@@ -132,6 +137,7 @@ func (t *Pool) LoopHeartbeat() {
 	}()
 }
 
+// Close 关闭连接池，并关闭池内所有连接
 func (t *Pool) Close() {
 	select {
 	case <-t.closedCh:

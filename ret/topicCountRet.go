@@ -17,14 +17,16 @@
 package ret
 
 import (
-	"github.com/buexplain/netsvr-protocol-go/v6/netsvrProtocol"
+	"github.com/buexplain/netsvr-protocol-go/v7/netsvrProtocol"
 )
 
+// TopicCountRet 统计网关主题数量的结果，key是网关地址，value是该网关返回的响应
 type TopicCountRet struct {
 	Data map[string]*netsvrProtocol.TopicCountResp
 }
 
-// Count 获取总数量
+// Count 全部网关主题数量之和
+// 注意：多网关部署时，不同网关之间的同名主题会被重复统计
 func (u *TopicCountRet) Count() int32 {
 	var ret int32
 	for _, v := range u.Data {

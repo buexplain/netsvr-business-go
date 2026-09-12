@@ -17,15 +17,17 @@
 package taskSocket
 
 import (
-	"github.com/buexplain/netsvr-business-go/v2/socket"
+	"github.com/buexplain/netsvr-business-go/v3/socket"
 	"time"
 )
 
+// TaskSocket 与网关 task 服务的一条连接，使用完必须调用 Release 归还给连接池
 type TaskSocket struct {
 	*socket.Socket
 	pool *Pool
 }
 
+// New 创建一个 task 连接对象，此时未建立连接，需自行调用 Connect
 func New(addr string, receiveTimeout time.Duration, sendTimeout time.Duration, connectTimeout time.Duration, pool *Pool) *TaskSocket {
 	return &TaskSocket{
 		Socket: socket.New(
@@ -38,6 +40,7 @@ func New(addr string, receiveTimeout time.Duration, sendTimeout time.Duration, c
 	}
 }
 
+// Release 将连接归还给所属连接池；连接不可用时由池回收该名额
 func (t *TaskSocket) Release() {
 	t.pool.release(t)
 }

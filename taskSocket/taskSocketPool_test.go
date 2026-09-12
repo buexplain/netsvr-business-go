@@ -18,7 +18,7 @@ package taskSocket
 
 import (
 	"bytes"
-	"github.com/buexplain/netsvr-business-go/v2/log"
+	"github.com/buexplain/netsvr-business-go/v3/log"
 	"log/slog"
 	"strings"
 	"sync"

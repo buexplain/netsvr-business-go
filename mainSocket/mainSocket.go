@@ -18,16 +18,17 @@ package mainSocket
 
 import (
 	"encoding/binary"
-	"github.com/buexplain/netsvr-business-go/v2/contract"
-	"github.com/buexplain/netsvr-business-go/v2/log"
-	"github.com/buexplain/netsvr-business-go/v2/socket"
-	"github.com/buexplain/netsvr-protocol-go/v6/netsvrProtocol"
+	"github.com/buexplain/netsvr-business-go/v3/contract"
+	"github.com/buexplain/netsvr-business-go/v3/log"
+	"github.com/buexplain/netsvr-business-go/v3/socket"
+	"github.com/buexplain/netsvr-protocol-go/v7/netsvrProtocol"
 	"google.golang.org/protobuf/proto"
 	"runtime/debug"
 	"sync"
 	"time"
 )
 
+// MainSocket 与网关 worker 服务的一条长连接，负责注册自己并接收网关转发的事件
 type MainSocket struct {
 	eventHandler      contract.EventInterface
 	socket            *socket.Socket
@@ -39,6 +40,8 @@ type MainSocket struct {
 	wg                sync.WaitGroup
 }
 
+// New 创建一个长连接对象。eventHandler 用于接收事件；events 声明需要接收的事件（按位或）；
+// heartbeatInterval 为心跳间隔。创建后需调用 Connect / Register 才会生效
 func New(eventHandler contract.EventInterface, socket *socket.Socket, heartbeatMessage []byte, events netsvrProtocol.Event, heartbeatInterval time.Duration) *MainSocket {
 	tmp := &MainSocket{
 		eventHandler:      eventHandler,
@@ -53,10 +56,12 @@ func New(eventHandler contract.EventInterface, socket *socket.Socket, heartbeatM
 	return tmp
 }
 
+// GetAddr 获取对端网关地址
 func (r *MainSocket) GetAddr() string {
 	return r.socket.GetAddr()
 }
 
+// LoopHeartbeat 启动心跳协程，按 heartbeatInterval 定期发送心跳
 func (r *MainSocket) LoopHeartbeat() {
 	go func() {
 		defer func() {
@@ -84,6 +89,8 @@ func (r *MainSocket) LoopHeartbeat() {
 	}()
 }
 
+// LoopReceive 启动接收协程，收到数据包后解析出事件并回调给 EventInterface；
+// 连接断开时会自动重连并重新注册
 func (r *MainSocket) LoopReceive() {
 	go func() {
 		defer func() {
@@ -154,10 +161,12 @@ func (r *MainSocket) processEvent(cmd netsvrProtocol.Cmd, message []byte) {
 	}()
 }
 
+// Connect 连接网关，成功返回 true
 func (r *MainSocket) Connect() bool {
 	return r.socket.Connect()
 }
 
+// Register 向网关注册自己并声明需要接收的事件，成功返回 true
 func (r *MainSocket) Register() bool {
 	req := &netsvrProtocol.RegisterReq{}
 	req.Events = int32(r.events)
@@ -191,6 +200,7 @@ func (r *MainSocket) Register() bool {
 	return true
 }
 
+// Unregister 向网关取消注册，成功返回 true
 func (r *MainSocket) Unregister() bool {
 	//通知心跳协程，退出心跳机制，避免同时写socket
 	r.closedCh <- struct{}{}
@@ -214,6 +224,7 @@ func (r *MainSocket) Unregister() bool {
 	return false
 }
 
+// Close 关闭长连接，并等待内部协程退出
 func (r *MainSocket) Close() {
 	close(r.closedCh)
 	r.wg.Wait()

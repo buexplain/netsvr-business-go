@@ -20,13 +20,14 @@ import (
 	"bufio"
 	"encoding/binary"
 	"errors"
-	"github.com/buexplain/netsvr-business-go/v2/log"
+	"github.com/buexplain/netsvr-business-go/v3/log"
 	"io"
 	"net"
 	"sync/atomic"
 	"time"
 )
 
+// Socket 与网关的一条 tcp 连接，收发数据包采用「4 字节大端长度 + 包体」的格式
 type Socket struct {
 	addr           string
 	receiveTimeout time.Duration
@@ -41,6 +42,7 @@ const socketConnectedNo = 0
 const socketConnectIng = 1
 const socketConnectedYes = 2
 
+// New 创建一个与 addr 的连接对象，此时并未建立连接，需要调用 Connect
 func New(addr string, receiveTimeout time.Duration, sendTimeout time.Duration, connectTimeout time.Duration) *Socket {
 	return &Socket{
 		addr:           addr,
@@ -51,10 +53,12 @@ func New(addr string, receiveTimeout time.Duration, sendTimeout time.Duration, c
 	}
 }
 
+// GetAddr 获取对端的地址
 func (s *Socket) GetAddr() string {
 	return s.addr
 }
 
+// IsConnected 判断当前是否处于已连接状态
 func (s *Socket) IsConnected() bool {
 	return atomic.LoadInt32(&s.connected) == socketConnectedYes
 }
@@ -65,6 +69,7 @@ func (s *Socket) close() {
 	}
 }
 
+// Close 关闭连接
 func (s *Socket) Close() {
 	if atomic.CompareAndSwapInt32(&s.connected, socketConnectIng, socketConnectedNo) {
 		return
@@ -72,6 +77,7 @@ func (s *Socket) Close() {
 	s.close()
 }
 
+// Connect 建立连接，成功返回 true
 func (s *Socket) Connect() bool {
 	if atomic.CompareAndSwapInt32(&s.connected, socketConnectedNo, socketConnectIng) {
 		defer atomic.CompareAndSwapInt32(&s.connected, socketConnectIng, socketConnectedNo)
@@ -94,6 +100,8 @@ func (s *Socket) Connect() bool {
 	return false
 }
 
+// Send 发送一个数据包（内部会补上 4 字节大端长度头），成功返回 true。
+// 若写入过部分数据导致 tcp 流被污染，会直接关闭连接。
 func (s *Socket) Send(message []byte) bool {
 	totalLen := len(message)
 	data := make([]byte, totalLen+4)
@@ -145,6 +153,7 @@ func (s *Socket) Send(message []byte) bool {
 	}
 }
 
+// Receive 阻塞读取一个数据包（不含 4 字节长度头），读取失败返回 nil
 func (s *Socket) Receive() []byte {
 	var timeout time.Time
 	if s.receiveTimeout > 0 {
