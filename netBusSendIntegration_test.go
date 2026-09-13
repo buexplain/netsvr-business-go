@@ -19,6 +19,7 @@ package netsvrBusiness
 import (
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/buexplain/netsvr-protocol-go/v7/netsvrProtocol"
 )
@@ -474,6 +475,109 @@ func TestForceOfflineGuest(t *testing.T) {
 		otherEnv.bus.ForceOfflineGuest(otherUniqIds, nil, 0)
 		if ret := otherEnv.bus.CheckOnline(otherUniqIds); len(ret.UniqIds()) != len(otherUniqIds) {
 			t.Fatalf("有 session 的连接不应被强制下线：期望 %d 个在线，实际 %v", len(otherUniqIds), ret.UniqIds())
+		}
+	})
+}
+
+// TestSingleCastBulkSkipInvalidTarget 目标不存在、目标为空、数据为空时网关会跳过，且不影响同项内的其它目标
+func TestSingleCastBulkSkipInvalidTarget(t *testing.T) {
+	forEachDeployment(t, func(t *testing.T, gateways []gatewayConfig) {
+		e := newEnv(t, gateways)
+		uniqIds := e.uniqIds()
+		// uniqId 的前 12 个十六进制字符是网关地址，尾部换成不存在的自增 id，
+		// 构造一个「落在同一个网关、但连接不存在」的目标
+		notExistUniqId := uniqIds[0][:12] + "ffffffffffffffff"
+		validFirst := uniqIds[0]
+		validSecond := uniqIds[1]
+		validThird := uniqIds[2]
+		dataFirst := uniqueData("skipInvalidTarget")
+		dataSecond := uniqueData("skipInvalidTarget")
+		items := []*netsvrProtocol.SingleCastBulkItem{
+			// 不存在的目标与真实目标混在同一项：真实目标照常收到数据
+			{UniqIds: []string{notExistUniqId, validFirst}, Data: [][]byte{[]byte(dataFirst)}},
+			// 同一项内混入空数据：空数据被跳过，真实数据照常投递
+			{UniqIds: []string{validSecond}, Data: [][]byte{[]byte(dataSecond), {}}},
+			// 目标为空：整项不处理
+			{UniqIds: nil, Data: [][]byte{[]byte(uniqueData("skipInvalidTarget"))}},
+			// 数据为空：整项不处理
+			{UniqIds: []string{validThird}, Data: nil},
+		}
+		e.bus.SingleCastBulk(items)
+		if got := e.clientOf(validFirst).receive(t); got != dataFirst {
+			t.Fatalf("连接 %s 收到的数据不符合预期：期望 %q，实际 %q", validFirst, dataFirst, got)
+		}
+		if got := e.clientOf(validSecond).receive(t); got != dataSecond {
+			t.Fatalf("连接 %s 收到的数据不符合预期：期望 %q，实际 %q", validSecond, dataSecond, got)
+		}
+		// 目标为空、数据为空的项不应投递任何数据，不存在的目标也不影响其它连接
+		e.clientOf(validThird).assertNoMessage(t, 300*time.Millisecond)
+		for _, client := range e.allClients() {
+			if client.uniqId == validFirst || client.uniqId == validSecond {
+				continue
+			}
+			client.assertNoMessage(t, 300*time.Millisecond)
+		}
+	})
+}
+
+// TestForceOfflineUncooperativeClient 客户端收到关闭帧后既不回关闭帧、也不断开连接，
+// 网关仍会在兜底时间到达后关闭连接（不会把连接一直挂着）
+func TestForceOfflineUncooperativeClient(t *testing.T) {
+	forEachDeployment(t, func(t *testing.T, gateways []gatewayConfig) {
+		e := newEnv(t, gateways)
+		uniqIds := e.uniqIds()
+		// 收到关闭帧时不回关闭帧，也不主动断开 TCP，让网关走 2 秒兜底关闭的分支
+		for _, client := range e.allClients() {
+			client.conn.SetCloseHandler(func(code int, text string) error {
+				return nil
+			})
+		}
+		e.bus.ForceOffline(uniqIds, nil)
+		for _, client := range e.allClients() {
+			if code := client.receiveClose(t); code != forceOfflineCloseCode {
+				t.Fatalf("连接 %s 的关闭码不符合预期：期望 %d，实际 %d", client.uniqId, forceOfflineCloseCode, code)
+			}
+		}
+		// 兜底关闭到达后，连接会从网关的在线列表里消失
+		e.waitOfflineWithin(uniqIds, 5*time.Second)
+	})
+}
+
+// TestSendToSharedCustomerId 同一个客户连接到多个网关时，给该客户发数据，各网关上的连接都能收到
+func TestSendToSharedCustomerId(t *testing.T) {
+	forEachDeployment(t, func(t *testing.T, gateways []gatewayConfig) {
+		e := newEnv(t, gateways)
+		uniqIds := e.uniqIds()
+		e.setUniqueCustomerId(uniqIds)
+		sharedCustomerId, sharedUniqIds := e.shareCustomerId(uniqIds)
+		shared := make(map[string]struct{}, len(sharedUniqIds))
+		for _, uniqId := range sharedUniqIds {
+			shared[uniqId] = struct{}{}
+		}
+		// 组播：该客户的全部连接（含跨网关）都收到
+		message := uniqueData("sendToSharedCustomerId")
+		e.bus.SendToCustomerIds([]string{sharedCustomerId}, []byte(message))
+		for _, uniqId := range sharedUniqIds {
+			if got := e.clientOf(uniqId).receive(t); got != message {
+				t.Fatalf("连接 %s 收到的数据不符合预期：期望 %q，实际 %q", uniqId, message, got)
+			}
+		}
+		// 批量单播：同上
+		message = uniqueData("singleCastBulkBySharedCustomerId")
+		e.bus.SingleCastBulkByCustomerId([]*netsvrProtocol.SingleCastBulkByCustomerIdItem{
+			{CustomerIds: []string{sharedCustomerId}, Data: [][]byte{[]byte(message)}},
+		})
+		for _, uniqId := range sharedUniqIds {
+			if got := e.clientOf(uniqId).receive(t); got != message {
+				t.Fatalf("连接 %s 收到的数据不符合预期：期望 %q，实际 %q", uniqId, message, got)
+			}
+		}
+		// 其它客户不应收到数据
+		for _, client := range e.allClients() {
+			if _, ok := shared[client.uniqId]; ok {
+				continue
+			}
+			client.assertNoMessage(t, 300*time.Millisecond)
 		}
 	})
 }

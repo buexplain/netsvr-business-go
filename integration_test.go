@@ -165,6 +165,19 @@ func (c *wsClient) send(t *testing.T, data string) {
 	}
 }
 
+// assertNoMessage 断言连接在给定时间内收不到数据
+func (c *wsClient) assertNoMessage(t *testing.T, timeout time.Duration) {
+	t.Helper()
+	if err := c.conn.SetReadDeadline(time.Now().Add(timeout)); err != nil {
+		t.Fatalf("设置读超时失败：%v", err)
+	}
+	_, message, err := c.conn.ReadMessage()
+	var netErr net.Error
+	if err == nil || !errors.As(err, &netErr) || !netErr.Timeout() {
+		t.Fatalf("连接 %s 不应收到数据，实际收到 %q（err=%v）", c.uniqId, message, err)
+	}
+}
+
 // close 关闭连接
 func (c *wsClient) close() {
 	if c.conn != nil {
@@ -234,6 +247,19 @@ func (e *env) allClients() []*wsClient {
 	return ret
 }
 
+// clientOf 按 uniqId 找到对应的测试连接
+func (e *env) clientOf(uniqId string) *wsClient {
+	for _, gw := range e.gateways {
+		for _, client := range e.clients[gw.taskAddr] {
+			if client.uniqId == uniqId {
+				return client
+			}
+		}
+	}
+	e.t.Fatalf("找不到 uniqId=%s 的测试连接", uniqId)
+	return nil
+}
+
 // updateConnInfo 给每个连接设置信息，mutate 负责填写要设置的字段
 func (e *env) updateConnInfo(uniqIds []string, mutate func(uniqId string, up *netsvrProtocol.ConnInfoUpdate)) {
 	e.t.Helper()
@@ -247,7 +273,13 @@ func (e *env) updateConnInfo(uniqIds []string, mutate func(uniqId string, up *ne
 // waitOffline 等待这些连接从网关下线；强制关闭是异步的，网关写完关闭帧后还要清理连接
 func (e *env) waitOffline(uniqIds []string) {
 	e.t.Helper()
-	deadline := time.Now().Add(3 * time.Second)
+	e.waitOfflineWithin(uniqIds, 3*time.Second)
+}
+
+// waitOfflineWithin 在给定时间内等待这些连接从网关下线
+func (e *env) waitOfflineWithin(uniqIds []string, timeout time.Duration) {
+	e.t.Helper()
+	deadline := time.Now().Add(timeout)
 	for {
 		if len(e.bus.CheckOnline(uniqIds).UniqIds()) == 0 {
 			return
