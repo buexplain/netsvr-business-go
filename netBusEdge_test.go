@@ -22,7 +22,9 @@ import (
 	"github.com/buexplain/netsvr-business-go/v3/taskSocket"
 )
 
-// TestNetBusEmptyInput 发送类方法的入参为空时不应发起任何请求
+// TestNetBusEmptyInput 发送类方法的入参为空时不应 panic，且调用后总线仍然可用。
+// 注意：这里用的是空管理器，而且「入参为空直接返回」与「没有连接所以发不出去」在网关侧
+// 没有可观测差异，因此本用例只是崩溃守卫，并不构成对「早退语义」的行为验证。
 func TestNetBusEmptyInput(t *testing.T) {
 	bus := NewNetBus(taskSocket.NewManger())
 	t.Cleanup(bus.Close)
@@ -33,6 +35,10 @@ func TestNetBusEmptyInput(t *testing.T) {
 	bus.ForceOffline(nil, nil)
 	bus.ForceOfflineByCustomerId(nil, nil)
 	bus.ForceOfflineGuest(nil, nil, 0)
+	// 调用后总线仍然可用
+	if ret := bus.CheckOnline([]string{"0000000000000000"}); len(ret.UniqIds()) != 0 {
+		t.Fatalf("空入参调用后总线状态异常：%v", ret.UniqIds())
+	}
 }
 
 // TestNewNetBusPanic 连接池管理器为空时创建 NetBus 会 panic

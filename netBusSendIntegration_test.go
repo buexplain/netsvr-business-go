@@ -509,12 +509,9 @@ func TestSingleCastBulkSkipInvalidTarget(t *testing.T) {
 		if got := e.clientOf(validSecond).receive(t); got != dataSecond {
 			t.Fatalf("连接 %s 收到的数据不符合预期：期望 %q，实际 %q", validSecond, dataSecond, got)
 		}
-		// 目标为空、数据为空的项不应投递任何数据，不存在的目标也不影响其它连接
-		e.clientOf(validThird).assertNoMessage(t, 300*time.Millisecond)
+		// 上面的预期数据都已收到，此后所有连接都不应再有任何数据：
+		// 既证明空目标、空数据的项没有投递，也证明不存在的目标没有影响任何其它连接
 		for _, client := range e.allClients() {
-			if client.uniqId == validFirst || client.uniqId == validSecond {
-				continue
-			}
 			client.assertNoMessage(t, 300*time.Millisecond)
 		}
 	})
@@ -538,6 +535,11 @@ func TestForceOfflineUncooperativeClient(t *testing.T) {
 				t.Fatalf("连接 %s 的关闭码不符合预期：期望 %d，实际 %d", client.uniqId, forceOfflineCloseCode, code)
 			}
 		}
+		// 兜底时间未到时连接仍应在网关的在线列表里：说明网关是在等兜底时间，而不是立刻关闭
+		time.Sleep(500 * time.Millisecond)
+		if ret := e.bus.CheckOnline(uniqIds); len(ret.UniqIds()) == 0 {
+			t.Fatalf("写出关闭帧后不应立即关闭连接（网关应等 2 秒兜底后再强制关闭）")
+		}
 		// 兜底关闭到达后，连接会从网关的在线列表里消失
 		e.waitOfflineWithin(uniqIds, 5*time.Second)
 	})
@@ -549,7 +551,7 @@ func TestSendToSharedCustomerId(t *testing.T) {
 		e := newEnv(t, gateways)
 		uniqIds := e.uniqIds()
 		e.setUniqueCustomerId(uniqIds)
-		sharedCustomerId, sharedUniqIds := e.shareCustomerId(uniqIds)
+		sharedCustomerId, sharedUniqIds := e.shareCustomerId()
 		shared := make(map[string]struct{}, len(sharedUniqIds))
 		for _, uniqId := range sharedUniqIds {
 			shared[uniqId] = struct{}{}

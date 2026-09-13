@@ -20,6 +20,7 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"slices"
 	"sort"
 	"sync/atomic"
 	"testing"
@@ -155,14 +156,6 @@ func (c *wsClient) receiveClose(t *testing.T) int {
 		t.Fatalf("连接 %s 未收到关闭帧：%v", c.uniqId, err)
 	}
 	return closeErr.Code
-}
-
-// send 向网关发送数据，网关会把它转发给业务进程
-func (c *wsClient) send(t *testing.T, data string) {
-	t.Helper()
-	if err := c.conn.WriteMessage(websocket.TextMessage, []byte(data)); err != nil {
-		t.Fatalf("连接 %s 发送数据失败：%v", c.uniqId, err)
-	}
 }
 
 // assertNoMessage 断言连接在给定时间内收不到数据
@@ -321,5 +314,19 @@ func assertSameSet(t *testing.T, msg string, want, got []string) {
 		if wantSorted[i] != gotSorted[i] {
 			t.Fatalf("%s：期望 %v，实际 %v", msg, want, got)
 		}
+	}
+}
+
+// assertSameList 忽略顺序但**不忽略重复**地比较两个列表。
+// 断言「跨网关去重」「合并后不应有重复项」这类语义时必须用它：
+// assertSameSet 会先去掉重复，结果里混进重复项时它看不出来。
+func assertSameList(t *testing.T, msg string, want, got []string) {
+	t.Helper()
+	wantSorted := slices.Clone(want)
+	gotSorted := slices.Clone(got)
+	slices.Sort(wantSorted)
+	slices.Sort(gotSorted)
+	if !slices.Equal(wantSorted, gotSorted) {
+		t.Fatalf("%s：期望 %v，实际 %v", msg, want, got)
 	}
 }

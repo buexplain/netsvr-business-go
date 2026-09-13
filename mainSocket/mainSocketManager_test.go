@@ -40,6 +40,7 @@ func TestMainSocketManager_AddSocket(t *testing.T) {
 }
 
 func TestMainSocketManager_Start_Close(t *testing.T) {
+	skipUnlessGatewayReady(t)
 	tmp := NewManager()
 	mainSocket, _, _, _ := makeMainSocket()
 	tmp.AddSocket(mainSocket)

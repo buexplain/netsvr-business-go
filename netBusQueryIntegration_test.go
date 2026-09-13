@@ -31,7 +31,7 @@ func (e *env) setUniqueCustomerId(uniqIds []string) {
 }
 
 // shareCustomerId 让每个网关各挑一个连接共享同一个 customerId，返回共享的 customerId 与这些连接
-func (e *env) shareCustomerId(uniqIds []string) (string, []string) {
+func (e *env) shareCustomerId() (string, []string) {
 	e.t.Helper()
 	sharedCustomerId := uniqueData("sharedCustomerId")
 	sharedUniqIds := make([]string, 0, len(e.gateways))
@@ -113,7 +113,7 @@ func TestCustomerIdList(t *testing.T) {
 		e := newEnv(t, gateways)
 		uniqIds := e.uniqIds()
 		e.setUniqueCustomerId(uniqIds)
-		sharedCustomerId, sharedUniqIds := e.shareCustomerId(uniqIds)
+		sharedCustomerId, sharedUniqIds := e.shareCustomerId()
 		// 期望的客户列表：共享的客户只算一个，其余连接各自一个
 		shared := make(map[string]struct{}, len(sharedUniqIds))
 		for _, uniqId := range sharedUniqIds {
@@ -128,7 +128,7 @@ func TestCustomerIdList(t *testing.T) {
 			expectCustomerIds = append(expectCustomerIds, uniqId)
 		}
 		ret := e.bus.CustomerIdList()
-		assertSameSet(t, "CustomerIdList 的 customerId", expectCustomerIds, ret.CustomerIds())
+		assertSameList(t, "CustomerIdList 的 customerId（跨网关去重后不应有重复项）", expectCustomerIds, ret.CustomerIds())
 		if ret.Len() != len(expectCustomerIds) {
 			t.Fatalf("CustomerIdList 的去重后客户数：期望 %d，实际 %d", len(expectCustomerIds), ret.Len())
 		}
@@ -172,7 +172,7 @@ func TestTopicList(t *testing.T) {
 		topics := []string{uniqueData("topic"), uniqueData("topic")}
 		e.subscribeAll(uniqIds, topics)
 		ret := e.bus.TopicList()
-		assertSameSet(t, "TopicList 的 topic", topics, ret.Topics())
+		assertSameList(t, "TopicList 的 topic（跨网关去重后不应有重复项）", topics, ret.Topics())
 		if !ret.Has(topics[0]) {
 			t.Fatalf("TopicList 未命中主题 %s", topics[0])
 		}
@@ -205,7 +205,7 @@ func TestTopicUniqIdList(t *testing.T) {
 		e.subscribeAll(uniqIds, topics)
 		ret := e.bus.TopicUniqIdList(topics)
 		for _, topic := range topics {
-			assertSameSet(t, "TopicUniqIdList 的 uniqId", uniqIds, ret.TopicUniqIds(topic))
+			assertSameList(t, "TopicUniqIdList 的 uniqId（直接合并，不应有重复项）", uniqIds, ret.TopicUniqIds(topic))
 		}
 		if got := ret.TopicUniqIds("notExistTopic"); len(got) != 0 {
 			t.Fatalf("不存在的主题应返回空：%v", got)
@@ -215,7 +215,7 @@ func TestTopicUniqIdList(t *testing.T) {
 			t.Fatalf("TopicUniqIdList 的主题数量：期望 %d，实际 %d", len(topics), len(all))
 		}
 		for _, topic := range topics {
-			assertSameSet(t, "TopicUniqIdList 的 UniqIds", uniqIds, all[topic])
+			assertSameList(t, "TopicUniqIdList 的 UniqIds（直接合并，不应有重复项）", uniqIds, all[topic])
 		}
 	})
 }
@@ -251,7 +251,7 @@ func TestTopicCustomerIdList(t *testing.T) {
 		e.subscribeAll(uniqIds, topics)
 		ret := e.bus.TopicCustomerIdList(topics)
 		for _, topic := range topics {
-			assertSameSet(t, "TopicCustomerIdList 的 customerId", uniqIds, ret.TopicCustomerIds(topic))
+			assertSameList(t, "TopicCustomerIdList 的 customerId（跨网关去重后不应有重复项）", uniqIds, ret.TopicCustomerIds(topic))
 		}
 		if got := ret.TopicCustomerIds("notExistTopic"); len(got) != 0 {
 			t.Fatalf("不存在的主题应返回空：%v", got)
@@ -261,7 +261,7 @@ func TestTopicCustomerIdList(t *testing.T) {
 			t.Fatalf("TopicCustomerIdList 的主题数量：期望 %d，实际 %d", len(topics), len(all))
 		}
 		for _, topic := range topics {
-			assertSameSet(t, "TopicCustomerIdList 的 CustomerIds", uniqIds, all[topic])
+			assertSameList(t, "TopicCustomerIdList 的 CustomerIds（跨网关去重后不应有重复项）", uniqIds, all[topic])
 		}
 	})
 }
@@ -298,10 +298,10 @@ func TestTopicCustomerIdToUniqIdsList(t *testing.T) {
 		e.subscribeAll(uniqIds, topics)
 		ret := e.bus.TopicCustomerIdToUniqIdsList(topics)
 		for _, topic := range topics {
-			assertSameSet(t, "TopicCustomerIdToUniqIdsList 的 customerId", uniqIds, ret.TopicCustomerIds(topic))
+			assertSameList(t, "TopicCustomerIdToUniqIdsList 的 customerId（跨网关去重后不应有重复项）", uniqIds, ret.TopicCustomerIds(topic))
 			// 每个客户只有一个连接
 			for _, uniqId := range uniqIds {
-				assertSameSet(t, "TopicCustomerIdToUniqIdsList 的 uniqId", []string{uniqId}, ret.CustomerUniqIds(topic, uniqId))
+				assertSameList(t, "TopicCustomerIdToUniqIdsList 的 uniqId", []string{uniqId}, ret.CustomerUniqIds(topic, uniqId))
 			}
 		}
 		if got := ret.TopicCustomerIds("notExistTopic"); len(got) != 0 {
@@ -388,7 +388,7 @@ func TestConnInfoByCustomerId(t *testing.T) {
 		e := newEnv(t, gateways)
 		uniqIds := e.uniqIds()
 		e.setUniqueCustomerId(uniqIds)
-		sharedCustomerId, sharedUniqIds := e.shareCustomerId(uniqIds)
+		sharedCustomerId, sharedUniqIds := e.shareCustomerId()
 		ret := e.bus.ConnInfoByCustomerId([]string{sharedCustomerId}, true, true, true)
 		items := ret.Get(sharedCustomerId)
 		gotUniqIds := make([]string, 0, len(items))
@@ -433,9 +433,10 @@ func TestLimit(t *testing.T) {
 		if len(ret.Data) != len(gateways) {
 			t.Fatalf("Limit 返回的网关数量：期望 %d，实际 %d", len(gateways), len(ret.Data))
 		}
+		// 不断言具体的限流值：协议里 0 表示不启用限流，具体值取决于网关的启动配置
 		for addr, resp := range ret.Data {
-			if resp.GetOnOpen() == 0 || resp.GetOnMessage() == 0 {
-				t.Fatalf("网关 %s 的限流配置不符合预期：onOpen=%d onMessage=%d", addr, resp.GetOnOpen(), resp.GetOnMessage())
+			if resp == nil {
+				t.Fatalf("网关 %s 的限流配置为空", addr)
 			}
 		}
 		// 只读取指定网关的限流配置
@@ -445,6 +446,18 @@ func TestLimit(t *testing.T) {
 		}
 		if len(single.Data) != 1 {
 			t.Fatalf("Limit 指定网关时返回的网关数量：期望 1，实际 %d", len(single.Data))
+		}
+		// 指定网关读取到的配置应与全量读取中该网关的配置一致
+		singleResp, ok := single.Data[gateways[0].taskAddr]
+		if !ok || singleResp == nil {
+			t.Fatalf("指定网关读取限流配置失败：%v", single.Data)
+		}
+		allResp := ret.Data[gateways[0].taskAddr]
+		if allResp == nil {
+			t.Fatalf("全量读取缺少网关 %s 的限流配置", gateways[0].taskAddr)
+		}
+		if singleResp.GetOnOpen() != allResp.GetOnOpen() || singleResp.GetOnMessage() != allResp.GetOnMessage() {
+			t.Fatalf("指定网关与全量读取的限流配置不一致：%v vs %v", singleResp, allResp)
 		}
 		// 不存在的网关返回 nil
 		if got := e.bus.Limit(nil, "127.0.0.1:1"); got != nil {
