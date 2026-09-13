@@ -31,8 +31,9 @@ func TestTaskSocketPoolManger_NewManger(t *testing.T) {
 }
 
 func TestTaskSocketPoolManger_AddSocket_GetSocket(t *testing.T) {
+	skipUnlessGatewayReady(t)
 	poolManger := NewManger()
-	factory := NewFactory("127.0.0.1:6062", time.Second*10, time.Second*10, time.Second*10)
+	factory := NewFactory(gatewayTaskAddr, time.Second*10, time.Second*10, time.Second*10)
 	pool := NewPool(10, factory, time.Second*10, time.Second*10, []byte("~6YOt5rW35piO~"))
 	pool.LoopHeartbeat()
 	poolManger.AddSocket(pool)
@@ -49,8 +50,9 @@ func TestTaskSocketPoolManger_AddSocket_GetSocket(t *testing.T) {
 }
 
 func TestTaskSocketPoolManger_GetSockets(t *testing.T) {
+	skipUnlessGatewayReady(t)
 	poolManger := NewManger()
-	factory := NewFactory("127.0.0.1:6062", time.Second*10, time.Second*10, time.Second*10)
+	factory := NewFactory(gatewayTaskAddr, time.Second*10, time.Second*10, time.Second*10)
 	pool := NewPool(10, factory, time.Second*10, time.Second*10, []byte("~6YOt5rW35piO~"))
 	pool.LoopHeartbeat()
 	poolManger.AddSocket(pool)
@@ -69,8 +71,9 @@ func TestTaskSocketPoolManger_GetSockets(t *testing.T) {
 }
 
 func TestTaskSocketPoolManger_Close(t *testing.T) {
+	skipUnlessGatewayReady(t)
 	poolManger := NewManger()
-	factory := NewFactory("127.0.0.1:6062", time.Second*10, time.Second*10, time.Second*10)
+	factory := NewFactory(gatewayTaskAddr, time.Second*10, time.Second*10, time.Second*10)
 	pool := NewPool(10, factory, time.Second*10, time.Second*10, []byte("~6YOt5rW35piO~"))
 	pool.LoopHeartbeat()
 	poolManger.AddSocket(pool)

@@ -20,14 +20,28 @@ import (
 	"bytes"
 	"github.com/buexplain/netsvr-business-go/v3/log"
 	"log/slog"
+	"net"
 	"strings"
 	"sync"
 	"testing"
 	"time"
 )
 
+// gatewayTaskAddr 测试环境里网关的 task 服务地址
+const gatewayTaskAddr = "127.0.0.1:6072"
+
+// skipUnlessGatewayReady 集成测试依赖正在运行的网关，连不上时跳过而不是失败
+func skipUnlessGatewayReady(t *testing.T) {
+	t.Helper()
+	conn, err := net.DialTimeout("tcp", gatewayTaskAddr, 500*time.Millisecond)
+	if err != nil {
+		t.Skipf("网关未运行（%s 不可达：%v），跳过集成测试", gatewayTaskAddr, err)
+	}
+	_ = conn.Close()
+}
+
 func TestTaskSocketPool_NewPool(t *testing.T) {
-	factory := NewFactory("127.0.0.1:6062", time.Second*10, time.Second*10, time.Second*10)
+	factory := NewFactory(gatewayTaskAddr, time.Second*10, time.Second*10, time.Second*10)
 	pool := NewPool(10, factory, time.Second*10, time.Second*10, []byte("~6YOt5rW35piO~"))
 	defer pool.Close()
 	if pool.pool == nil || cap(pool.pool) != 10 {
@@ -45,7 +59,7 @@ func TestTaskSocketPool_NewPool(t *testing.T) {
 }
 
 func TestTaskSocketPool_GetAddr(t *testing.T) {
-	factory := NewFactory("127.0.0.1:6062", time.Second*10, time.Second*10, time.Second*10)
+	factory := NewFactory(gatewayTaskAddr, time.Second*10, time.Second*10, time.Second*10)
 	pool := NewPool(10, factory, time.Second*10, time.Second*10, []byte("~6YOt5rW35piO~"))
 	defer pool.Close()
 	if pool.GetAddr() != factory.GetAddr() {
@@ -54,8 +68,9 @@ func TestTaskSocketPool_GetAddr(t *testing.T) {
 }
 
 func TestTaskSocketPool_Get(t *testing.T) {
+	skipUnlessGatewayReady(t)
 	size := 10
-	factory := NewFactory("127.0.0.1:6062", time.Second*10, time.Second*10, time.Second*10)
+	factory := NewFactory(gatewayTaskAddr, time.Second*10, time.Second*10, time.Second*10)
 	pool := NewPool(size, factory, time.Second*10, time.Second*10, []byte("~6YOt5rW35piO~"))
 	defer pool.Close()
 	if pool.GetAddr() != factory.GetAddr() {
@@ -82,8 +97,9 @@ func TestTaskSocketPool_Get(t *testing.T) {
 }
 
 func TestTaskSocketPool_ConcurrencyGet(t *testing.T) {
+	skipUnlessGatewayReady(t)
 	size := 10
-	factory := NewFactory("127.0.0.1:6062", time.Second*10, time.Second*10, time.Second*10)
+	factory := NewFactory(gatewayTaskAddr, time.Second*10, time.Second*10, time.Second*10)
 	pool := NewPool(size, factory, time.Second*10, time.Second*10, []byte("~6YOt5rW35piO~"))
 	defer pool.Close()
 	wg := &sync.WaitGroup{}
@@ -110,8 +126,9 @@ func TestTaskSocketPool_ConcurrencyGet(t *testing.T) {
 }
 
 func TestTaskSocketPool_WaitTimeoutGet(t *testing.T) {
+	skipUnlessGatewayReady(t)
 	size := 2
-	factory := NewFactory("127.0.0.1:6062", time.Second*10, time.Second*10, time.Second*10)
+	factory := NewFactory(gatewayTaskAddr, time.Second*10, time.Second*10, time.Second*10)
 	pool := NewPool(size, factory, time.Second*10, time.Second*10, []byte("~6YOt5rW35piO~"))
 	defer pool.Close()
 	taskSocketList := make([]*TaskSocket, 0, size)
@@ -122,6 +139,9 @@ func TestTaskSocketPool_WaitTimeoutGet(t *testing.T) {
 				t.Error("WaitTimeoutGet failed")
 			}
 			continue
+		}
+		if taskSocket == nil {
+			t.Fatalf("获取 task 连接失败")
 		}
 		taskSocketList = append(taskSocketList, taskSocket)
 	}
@@ -143,6 +163,7 @@ func TestTaskSocketPool_WaitTimeoutGet(t *testing.T) {
 }
 
 func TestTaskSocketPool_LoopHeartbeat(t *testing.T) {
+	skipUnlessGatewayReady(t)
 	stdOut := bytes.NewBuffer(nil)
 	defaultLog := log.GetLogger()
 	log.SetLogger(slog.New(slog.NewTextHandler(stdOut, nil)))
@@ -150,11 +171,14 @@ func TestTaskSocketPool_LoopHeartbeat(t *testing.T) {
 		log.SetLogger(defaultLog)
 	}()
 	size := 10
-	factory := NewFactory("127.0.0.1:6062", time.Second*10, time.Second*10, time.Second*10)
+	factory := NewFactory(gatewayTaskAddr, time.Second*10, time.Second*10, time.Second*10)
 	pool := NewPool(size, factory, time.Second*10, time.Millisecond*100, []byte("~6YOt5rW35piO~"))
 	taskSocketList := make([]*TaskSocket, 0, size)
 	for i := 0; i < size; i++ {
 		taskSocket := pool.Get()
+		if taskSocket == nil {
+			t.Fatalf("获取 task 连接失败")
+		}
 		taskSocketList = append(taskSocketList, taskSocket)
 	}
 	for _, taskSocket := range taskSocketList {
@@ -171,12 +195,16 @@ func TestTaskSocketPool_LoopHeartbeat(t *testing.T) {
 }
 
 func TestTaskSocketPool_Close(t *testing.T) {
+	skipUnlessGatewayReady(t)
 	size := 10
-	factory := NewFactory("127.0.0.1:6062", time.Second*10, time.Second*10, time.Second*10)
+	factory := NewFactory(gatewayTaskAddr, time.Second*10, time.Second*10, time.Second*10)
 	pool := NewPool(size, factory, time.Second*10, time.Second*10, []byte("~6YOt5rW35piO~"))
 	taskSocketList := make([]*TaskSocket, 0, size)
 	for i := 0; i < size; i++ {
 		taskSocket := pool.Get()
+		if taskSocket == nil {
+			t.Fatalf("获取 task 连接失败")
+		}
 		taskSocketList = append(taskSocketList, taskSocket)
 	}
 	if len(pool.pool) != 0 {

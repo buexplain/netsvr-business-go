@@ -20,17 +20,31 @@ import (
 	"encoding/binary"
 	"github.com/buexplain/netsvr-protocol-go/v7/netsvrProtocol"
 	"google.golang.org/protobuf/proto"
+	"net"
 	"sync/atomic"
 	"testing"
 	"time"
 )
 
+// gatewayTaskAddr 测试环境里网关的 task 服务地址
+const gatewayTaskAddr = "127.0.0.1:6072"
+
+// skipUnlessGatewayReady 集成测试依赖正在运行的网关，连不上时跳过而不是失败
+func skipUnlessGatewayReady(t *testing.T) {
+	t.Helper()
+	conn, err := net.DialTimeout("tcp", gatewayTaskAddr, 500*time.Millisecond)
+	if err != nil {
+		t.Skipf("网关未运行（%s 不可达：%v），跳过集成测试", gatewayTaskAddr, err)
+	}
+	_ = conn.Close()
+}
+
 func TestSocket_NewSocket(t *testing.T) {
-	s := New("127.0.0.1:6062", time.Second*5, time.Second*5, time.Second*5)
+	s := New(gatewayTaskAddr, time.Second*5, time.Second*5, time.Second*5)
 	if s.socket != nil {
 		t.Error("连接已经打开")
 	}
-	if s.addr != "127.0.0.1:6062" {
+	if s.addr != gatewayTaskAddr {
 		t.Error("地址不正确")
 	}
 	if s.connectTimeout != time.Second*5 {
@@ -42,7 +56,8 @@ func TestSocket_NewSocket(t *testing.T) {
 }
 
 func TestSocket_Connect(t *testing.T) {
-	s := New("127.0.0.1:6062", time.Second*5, time.Second*5, time.Second*5)
+	skipUnlessGatewayReady(t)
+	s := New(gatewayTaskAddr, time.Second*5, time.Second*5, time.Second*5)
 	if s.Connect() != true {
 		t.Error("连接失败")
 	}
@@ -56,7 +71,8 @@ func TestSocket_Connect(t *testing.T) {
 }
 
 func TestSocket_Send(t *testing.T) {
-	s := New("127.0.0.1:6062", time.Second*5, time.Second*5, time.Second*5)
+	skipUnlessGatewayReady(t)
+	s := New(gatewayTaskAddr, time.Second*5, time.Second*5, time.Second*5)
 	s.Connect()
 	defer s.Close()
 	if s.Send([]byte("~6YOt5rW35piO~")) != true {
@@ -65,7 +81,8 @@ func TestSocket_Send(t *testing.T) {
 }
 
 func TestSocket_Receive(t *testing.T) {
-	s := New("127.0.0.1:6062", time.Second*5, time.Second*5, time.Second*5)
+	skipUnlessGatewayReady(t)
+	s := New(gatewayTaskAddr, time.Second*5, time.Second*5, time.Second*5)
 	s.Connect()
 	defer s.Close()
 	message := make([]byte, 4)
@@ -84,7 +101,8 @@ func TestSocket_Receive(t *testing.T) {
 }
 
 func TestSocket_Close(t *testing.T) {
-	s := New("127.0.0.1:6062", time.Second*5, time.Second*5, time.Second*5)
+	skipUnlessGatewayReady(t)
+	s := New(gatewayTaskAddr, time.Second*5, time.Second*5, time.Second*5)
 	s.Connect()
 	s.Close()
 	if s.IsConnected() == true {
@@ -92,5 +110,34 @@ func TestSocket_Close(t *testing.T) {
 	}
 	if atomic.LoadInt32(&s.connected) != socketConnectedNo {
 		t.Error("关闭失败")
+	}
+}
+
+func TestSocket_ConnectFail(t *testing.T) {
+	s := New("127.0.0.1:1", time.Millisecond*300, time.Millisecond*300, time.Millisecond*300)
+	if s.Connect() {
+		s.Close()
+		t.Error("连接不存在的地址应该失败")
+	}
+	if s.IsConnected() {
+		t.Error("连接失败后不应处于已连接状态")
+	}
+}
+
+func TestSocket_SendReceiveAfterClose(t *testing.T) {
+	skipUnlessGatewayReady(t)
+	s := New(gatewayTaskAddr, time.Second*5, time.Second*5, time.Second*5)
+	if !s.Connect() {
+		t.Fatalf("连接网关失败")
+	}
+	if s.GetAddr() != gatewayTaskAddr {
+		t.Errorf("GetAddr 不正确：%s", s.GetAddr())
+	}
+	s.Close()
+	if s.Send([]byte("~6YOt5rW35piO~")) {
+		t.Error("连接关闭后发送应该失败")
+	}
+	if s.Receive() != nil {
+		t.Error("连接关闭后接收应该返回 nil")
 	}
 }

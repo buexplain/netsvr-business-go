@@ -22,9 +22,23 @@ import (
 	"github.com/buexplain/netsvr-business-go/v3/socket"
 	"github.com/buexplain/netsvr-protocol-go/v7/netsvrProtocol"
 	"google.golang.org/protobuf/encoding/protojson"
+	"net"
 	"testing"
 	"time"
 )
+
+// gatewayWorkerAddr 测试环境里网关的 worker 服务地址
+const gatewayWorkerAddr = "127.0.0.1:6071"
+
+// skipUnlessGatewayReady 集成测试依赖正在运行的网关，连不上时跳过而不是失败
+func skipUnlessGatewayReady(t *testing.T) {
+	t.Helper()
+	conn, err := net.DialTimeout("tcp", gatewayWorkerAddr, 500*time.Millisecond)
+	if err != nil {
+		t.Skipf("网关未运行（%s 不可达：%v），跳过集成测试", gatewayWorkerAddr, err)
+	}
+	_ = conn.Close()
+}
 
 type eventForMainSocketTest struct {
 }
@@ -43,7 +57,7 @@ func (e *eventForMainSocketTest) OnClose(connClose *netsvrProtocol.ConnClose) {
 
 func makeMainSocket() (*MainSocket, contract.EventInterface, netsvrProtocol.Event, *socket.Socket) {
 	h := new(eventForMainSocketTest)
-	sk := socket.New("127.0.0.1:6061", time.Second*25, time.Second*25, time.Second*25)
+	sk := socket.New(gatewayWorkerAddr, time.Second*25, time.Second*25, time.Second*25)
 	events := netsvrProtocol.Event_OnOpen | netsvrProtocol.Event_OnClose | netsvrProtocol.Event_OnMessage
 	mainSocket := New(h, sk, []byte("~6YOt5rW35piO~"), events, time.Second*25)
 	return mainSocket, h, events, sk
@@ -71,12 +85,13 @@ func TestMainSocket_NewMainSocket(t *testing.T) {
 
 func TestMainSocket_GetAddr(t *testing.T) {
 	mainSocket, _, _, _ := makeMainSocket()
-	if mainSocket.GetAddr() != "127.0.0.1:6061" {
+	if mainSocket.GetAddr() != gatewayWorkerAddr {
 		t.Error("GetAddr is not equal")
 	}
 }
 
 func TestMainSocket_Connect(t *testing.T) {
+	skipUnlessGatewayReady(t)
 	mainSocket, _, _, _ := makeMainSocket()
 	if mainSocket.Connect() == false {
 		t.Error("Connect failed")
@@ -89,6 +104,7 @@ func TestMainSocket_Connect(t *testing.T) {
 }
 
 func TestMainSocket_Register_Unregister(t *testing.T) {
+	skipUnlessGatewayReady(t)
 	mainSocket, _, _, _ := makeMainSocket()
 	if mainSocket.Connect() == false {
 		t.Error("Connect failed")
