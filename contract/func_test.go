@@ -23,3 +23,15 @@ func TestFunc_AddrConvertToHex(t *testing.T) {
 		t.Error("task服务器监听的ip地址转为16进制字符串失败")
 	}
 }
+
+func TestFunc_UniqIdConvertToAddrAsHex(t *testing.T) {
+	// uniqId 的前 12 个十六进制字符就是网关的 task 服务地址
+	uniqId := "7f00000117b8" + "68c7b2a1" + "00000001"
+	if UniqIdConvertToAddrAsHex(uniqId) != "7f00000117b8" {
+		t.Errorf("从 uniqId 解析网关地址失败：%s", UniqIdConvertToAddrAsHex(uniqId))
+	}
+	// 长度不是 28 的 uniqId 是不合法的
+	if UniqIdConvertToAddrAsHex("7f00000117b8") != "" {
+		t.Error("非法的 uniqId 应该返回空字符串")
+	}
+}
